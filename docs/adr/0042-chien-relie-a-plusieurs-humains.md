@@ -57,6 +57,10 @@ Sur le profil d'un humain, la carte d'un chien partagé affiche « aussi avec {p
 - **Notification.** Type `registration_cancelled_by_owner`, préférence `registrations` : « Inscription annulée » / « {nom} a annulé l'inscription de {chien} à « {titre} ». ».
 - **Données de démonstration.** Romain Gasser et Laura Petit partagent Oscar ; Laura l'inscrit à « Cani-balade au lever du soleil ».
 
+## Précisions de l'implémentation (mobile)
+
+- **Lien d'invitation avant la connexion.** Le lien `uzu://invitation/{jeton}` est intercepté par `src/app/+native-intent.ts` (Expo Router), au démarrage comme application ouverte. Le jeton est gardé en mémoire seulement (jamais écrit sur l'appareil, affiché ni journalisé), puis l'écran de l'invitation s'ouvre dès que la personne est connectée. Pour un nouveau compte, l'invitation passe juste après le profil, avant « Ajoute ton premier chien ». Le lien sert une fois et s'efface à la fin d'une session ; il est perdu si le système tue l'application pendant la connexion. Ce mécanisme est distinct de celui des notifications, qui jette au contraire un appui reçu déconnecté pour ne pas le livrer à un autre compte.
+
 ## Questions ouvertes
 
 - **Retirer un autre propriétaire.** Aujourd'hui seul un propriétaire peut se retirer lui-même. Faut-il permettre à un propriétaire d'en retirer un autre (séparation, invitation à la mauvaise personne), et sous quelle protection contre un retrait abusif ?

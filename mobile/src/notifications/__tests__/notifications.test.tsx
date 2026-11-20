@@ -52,6 +52,7 @@ describe('notification links', () => {
       'registration_requested',
       'registration_accepted',
       'registration_declined',
+      'registration_cancelled_by_owner',
       'walk_updated',
       'walk_cancelled',
       'walk_reminder',

@@ -85,7 +85,7 @@ public static class UserEndpoints
             return Problems.NotFound(ErrorCodes.UserNotFound, "The user does not exist.");
         }
 
-        var dogs = await db.Dogs.AsNoTracking().WithMembers().Where(d => d.OwnerId == id).OrderForDisplay().ToListAsync(cancellationToken);
+        var dogs = await db.Dogs.AsNoTracking().WithMembers().OwnedBy(id).OrderForDisplay().ToListAsync(cancellationToken);
         return TypedResults.Ok(PublicUserResponse.From(user, dogs));
     }
 }

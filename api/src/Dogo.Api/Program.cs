@@ -108,6 +108,7 @@ if (mapDemoData)
 var authenticated = api.MapGroup("").ProducesProblem(StatusCodes.Status401Unauthorized);
 authenticated.MapUserEndpoints();
 authenticated.MapDogEndpoints();
+authenticated.MapDogInvitationEndpoints();
 authenticated.MapPhotoEndpoints();
 authenticated.MapWalkEndpoints();
 authenticated.MapRegistrationEndpoints();

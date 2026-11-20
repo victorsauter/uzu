@@ -264,7 +264,7 @@ public sealed class DemoDataTests(ApiFixture fixture) : DemoDataTestBase(fixture
     private Task<string> SnapshotAsync(Guid userId) => WithDbAsync(async db =>
     {
         var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == userId, Ct);
-        var dogs = await db.Dogs.AsNoTracking().Where(d => d.OwnerId == userId).OrderBy(d => d.Id).ToListAsync(Ct);
+        var dogs = await db.Dogs.AsNoTracking().Where(d => d.Members.Any(m => m.UserId == userId)).OrderBy(d => d.Id).ToListAsync(Ct);
         var walks = await db.Walks.AsNoTracking().Where(w => w.OrganizerId == userId).OrderBy(w => w.Id)
             .Select(w => new { w.Id, w.Title, w.Description, w.StartsAt, w.Status, w.MaxDogs, w.AllowedSizes, w.LocationLabel, w.CreatedAt })
             .ToListAsync(Ct);

@@ -17,6 +17,13 @@ export type Dog = Schemas['DogResponse'];
 /** One human linked to a dog: their summary and their role (only `Owner` in V1). */
 export type DogMember = Schemas['DogMemberResponse'];
 export type PublicUser = Schemas['PublicUserResponse'];
+/** A pending invitation to a dog, listed to its owners (no token). */
+export type DogInvitation = Schemas['DogInvitationResponse'];
+/** An invitation just created: the only response that carries the token and the link. */
+export type CreatedDogInvitation = Schemas['CreatedDogInvitationResponse'];
+/** What the person invited sees before accepting. */
+export type DogInvitationPreview = Schemas['DogInvitationPreviewResponse'];
+export type DogMemberRole = Schemas['DogMemberRole'];
 export type CreateDogRequest = Schemas['CreateDogRequest'];
 export type UpdateDogRequest = Schemas['UpdateDogRequest'];
 
@@ -27,6 +34,8 @@ export type WalkDetail = Schemas['WalkDetailResponse'];
 export type MyWalk = Schemas['MyWalkResponse'];
 export type Participant = Schemas['ParticipantResponse'];
 export type MyRegistration = Schemas['MyRegistrationResponse'];
+/** A registration of one of my dogs, whichever owner made it (`registeredBy`). */
+export type DogRegistration = Schemas['DogRegistrationResponse'];
 export type Registration = Schemas['RegistrationResponse'];
 export type CreateWalkRequest = Schemas['CreateWalkRequest'];
 export type UpdateWalkRequest = Schemas['UpdateWalkRequest'];

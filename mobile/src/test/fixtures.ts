@@ -122,6 +122,7 @@ export function walkDetail(overrides: Partial<WalkDetail> = {}): WalkDetail {
     isOrganizer: false,
     participants: [],
     myRegistrations: [],
+    myDogsRegistrations: [],
     pendingRegistrations: [],
     ...overrides,
   };

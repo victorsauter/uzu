@@ -98,7 +98,9 @@ La version 0.3 permet de relier un chien à plusieurs humains (ADR 0042, « Prop
 
 Les règles se contrôlent dans cet ordre à l'acceptation ; la consultation ne contrôle que les trois premières. Créer ou révoquer une invitation est réservé aux propriétaires du chien (403 `dog.forbidden` sinon, 404 si le chien n'existe pas), et un rôle autre que `Owner` est refusé comme une erreur de validation du champ `role`.
 
-**Ne plus s'occuper d'un chien.** Un propriétaire supprime son propre lien avec le chien, à condition qu'il reste au moins un autre propriétaire ; sinon 409 `dog.last_owner` (il peut alors seulement supprimer le chien). Supprimer le chien alors qu'un autre propriétaire reste est refusé : 409 `dog.has_other_owners`. Un propriétaire ne peut pas retirer un autre propriétaire (question ouverte, ADR 0042). Quitter un chien ne touche pas aux inscriptions déjà faites : elles restent à l'humain qui les a créées.
+Précisions de l'implémentation : le jeton compte 256 bits aléatoires, encodés en base64url sans remplissage (43 caractères) ; le serveur en garde l'empreinte SHA-256. Un jeton mal formé répond comme un jeton inconnu (`invitation.not_found`). Révoquer est idempotent ; révoquer une invitation déjà acceptée répond 409 `invitation.already_used`, une invitation inconnue de ce chien 404 `invitation.not_found`. La consultation et l'acceptation par jeton suivent la limite de débit des écritures sensibles, même la consultation qui est une lecture (ADR 0031, 0042).
+
+**Ne plus s'occuper d'un chien.** Un propriétaire supprime son propre lien avec le chien, à condition qu'il reste au moins un autre propriétaire ; sinon 409 `dog.last_owner` (il peut alors seulement supprimer le chien). Supprimer le chien alors qu'un autre propriétaire reste est refusé : 409 `dog.has_other_owners`. Un propriétaire ne peut pas retirer un autre propriétaire (question ouverte, ADR 0042). Quitter un chien ne touche pas aux inscriptions déjà faites : elles restent à l'humain qui les a créées. Quelqu'un qui n'est pas propriétaire du chien reçoit 403 `dog.forbidden`.
 
 ### 4.2 Balades
 
@@ -133,6 +135,7 @@ Une inscription concerne un chien. On peut inscrire plusieurs de ses chiens en u
 - L'auteur de l'inscription ou tout propriétaire du chien l'annule avant le début ; la place est libérée.
 - L'organisateur peut refuser ou retirer un participant ; l'inscription passe à `Declined`.
 - La fiche d'une balade montre les chiens `Accepted` avec leur profil et l'humain qui vient avec eux. Les inscriptions `Pending` ne sont visibles que de l'organisateur, de leur auteur et des propriétaires du chien.
+- La fiche d'une balade (`WalkDetailResponse`) donne à chacun, en plus de `myRegistrations` (ses propres inscriptions, tout statut), `myDogsRegistrations` : les inscriptions `Pending` et `Accepted` des chiens dont il est propriétaire, quel que soit l'humain qui les a faites, de la plus ancienne à la plus récente. Chaque élément vaut `{ id, dogId, status, registeredBy }`, où `registeredBy` est l'humain de l'inscription (`UserSummaryResponse`). C'est ce qui permet d'afficher « Déjà inscrit par {prénom} » et d'annuler l'inscription (`DELETE /walks/{id}/registrations/{id}`).
 - Le blocage, les notifications et le fil de messages visent l'humain de l'inscription (`Registration.userId`), jamais le chien ni ses autres propriétaires. Conséquence assumée : si un organisateur a bloqué Camille, Victor peut quand même inscrire Noux, leur chien commun.
 
 ### 4.4 Fil de balade et notifications
@@ -144,7 +147,7 @@ Une inscription concerne un chien. On peut inscrire plusieurs de ses chiens en u
 | --- | --- | --- |
 | Nouvelle inscription ou demande | Organisateur | `registrations` |
 | Inscription acceptée ou refusée | Auteur de l'inscription | `registrations` |
-| Inscription annulée par un autre propriétaire du chien | Auteur de l'inscription | `registrations` |
+| Inscription annulée par un autre propriétaire du chien (`registration_cancelled_by_owner`) | Auteur de l'inscription | `registrations` |
 | Balade modifiée ou annulée | Inscrits `Accepted` et `Pending` | `walkChanges` |
 | Nouveau message | Organisateur et inscrits `Accepted`, sauf l'auteur | `messages` |
 | Rappel, 2 heures avant le début | Organisateur et inscrits `Accepted` | `reminders` |
@@ -232,7 +235,7 @@ Tous sous `/api/v1`.
 | --- | --- |
 | `POST /walks` | Créer une balade |
 | `GET /walks?lat&lng&radiusKm&from&to&size` | Rechercher les balades proches |
-| `GET /walks/{id}` | Fiche, avec les participants |
+| `GET /walks/{id}` | Fiche, avec les participants, mes inscriptions et les inscriptions actives de mes chiens (`myDogsRegistrations`, §4.3) |
 | `PATCH /walks/{id}`, `POST /walks/{id}/cancel` | Modifier, annuler |
 | `GET /me/walks?role&when` | Mes balades : `role` vaut `Organizer` ou `Participant`, `when` vaut `Upcoming` ou `Past` |
 | `POST /walks/{id}/registrations` | Inscrire un ou plusieurs chiens |
@@ -317,6 +320,7 @@ Ces points n'étaient pas tranchés dans le périmètre. Ils sont faciles à cha
 | Identifiant de l'application | `com.victorsauter.uzu` (bundle iOS et paquet Android), schéma de lien `uzu://` | Figé au premier envoi à un store (ADR 0039, 0041) |
 | Invitation de chien | Lien `uzu://invitation/{jeton}`, jeton gardé haché, à usage unique, 7 jours, révocable, valable même si son auteur quitte le chien | Décidé par le porteur du projet (ADR 0042) ; forme du lien, hachage et survie à l'auteur choisis par l'agent |
 | Départ d'un propriétaire | Ses inscriptions déjà faites pour le chien restent | Évite d'annuler en silence ce qu'un humain a organisé ; à confirmer |
+| Inscriptions des chiens partagés sur la fiche | Liste `myDogsRegistrations` à côté de `myRegistrations`, sans changer cette dernière | Le client affiche « Déjà inscrit par {prénom} » sans recouper les participants ; `myRegistrations` garde son sens (choix de l'agent API) |
 | Fuseau des séries | `Europe/Paris` | Le pilote est en France |
 | Centre de la carte par défaut | Seppois-le-Haut, réglable par configuration | C'est la zone pilote |
 | Données de démonstration | Jeu fictif autour de Seppois-le-Haut, activable en développement seulement (ADR 0027) | Essayer l'application sans attendre de vrais utilisateurs |

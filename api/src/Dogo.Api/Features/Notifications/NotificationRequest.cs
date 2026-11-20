@@ -24,6 +24,12 @@ public enum NotificationType
     /// <summary>To the author of the registration (request declined or participant removed).</summary>
     RegistrationDeclined,
 
+    /// <summary>
+    /// To the author of the registration: another owner of the dog cancelled it (ADR 0042). The
+    /// detail is the dog's name.
+    /// </summary>
+    RegistrationCancelledByOwner,
+
     /// <summary>To accepted and pending registrants.</summary>
     WalkUpdated,
 

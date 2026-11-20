@@ -216,7 +216,7 @@ public static class AdminEndpoints
         organization.CreatedAt);
 
     private static IQueryable<Report> WithReferences(IQueryable<Report> reports) =>
-        reports.Include(r => r.Reporter).Include(r => r.TargetUser).Include(r => r.TargetDog).ThenInclude(d => d!.Owner).Include(r => r.Walk);
+        reports.Include(r => r.Reporter).Include(r => r.TargetUser).Include(r => r.TargetDog).ThenInclude(d => d!.Members).ThenInclude(m => m.User).Include(r => r.Walk);
 
     private static ProblemHttpResult UserNotFound() => Problems.NotFound(ErrorCodes.UserNotFound, "The user does not exist.");
 }

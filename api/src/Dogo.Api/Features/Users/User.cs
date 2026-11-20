@@ -43,7 +43,8 @@ public sealed class User : IHasCreatedAt
 
     public DateTimeOffset CreatedAt { get; set; }
 
-    public List<Dog> Dogs { get; } = [];
+    /// <summary>Links to the dogs this user is one of the humans of (ADR 0042).</summary>
+    public List<DogMember> DogLinks { get; } = [];
 }
 
 internal sealed class UserConfiguration : IEntityTypeConfiguration<User>

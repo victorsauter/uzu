@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Dogo.Api.Features.Dogs;
 using Dogo.Api.Features.Messages;
 using Dogo.Api.Features.Organizations;
@@ -19,18 +20,21 @@ public sealed class DemoDataInvariantTests(ApiFixture fixture) : DemoDataTestBas
     {
         await GenerateAsync();
         var now = DateTimeOffset.UtcNow;
-        var (walks, registrations, dogs) = await WithDbAsync(async db => (
+        var (walks, registrations, dogs, members) = await WithDbAsync(async db => (
             await db.Walks.AsNoTracking().ToListAsync(Ct),
             await db.Registrations.AsNoTracking().ToListAsync(Ct),
-            (await db.Dogs.AsNoTracking().ToListAsync(Ct)).ToDictionary(d => d.Id)));
+            (await db.Dogs.AsNoTracking().ToListAsync(Ct)).ToDictionary(d => d.Id),
+            (await db.DogMembers.AsNoTracking().Where(m => m.Role == DogMemberRole.Owner).Select(m => new { m.DogId, m.UserId }).ToListAsync(Ct))
+                .Select(m => (m.DogId, m.UserId)).ToHashSet()));
 
         foreach (var walk in walks)
         {
             var mine = registrations.Where(r => r.WalkId == walk.Id).ToList();
             var accepted = mine.Where(r => r.Status == RegistrationStatus.Accepted).ToList();
 
+            // The human of a registration is an owner of the dog, not necessarily the first (ADR 0042).
             Assert.InRange(accepted.Count, 0, walk.MaxDogs);
-            Assert.All(mine, r => Assert.Equal(dogs[r.DogId!.Value].OwnerId, r.UserId));
+            Assert.All(mine, r => Assert.Contains((r.DogId!.Value, r.UserId), members));
             Assert.All(mine.Where(r => Active.Contains(r.Status)), r => Assert.Contains(dogs[r.DogId!.Value].Size, walk.AllowedSizes));
             Assert.Equal(mine.Count(r => Active.Contains(r.Status)), mine.Where(r => Active.Contains(r.Status)).Select(r => r.DogId).Distinct().Count());
 
@@ -188,10 +192,15 @@ public sealed class DemoDataInvariantTests(ApiFixture fixture) : DemoDataTestBas
     {
         await GenerateAsync();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var (users, dogs, educators) = await WithDbAsync(async db => (
+        var (users, dogs, educators, links) = await WithDbAsync(async db => (
             await db.Users.AsNoTracking().ToListAsync(Ct),
             await db.Dogs.AsNoTracking().ToListAsync(Ct),
-            await db.Memberships.Where(m => m.Status == MembershipStatus.Accepted && m.Role != MembershipRole.Member).Select(m => m.UserId).Distinct().ToListAsync(Ct)));
+            await db.Memberships.Where(m => m.Status == MembershipStatus.Accepted && m.Role != MembershipRole.Member).Select(m => m.UserId).Distinct().ToListAsync(Ct),
+            await db.DogMembers.AsNoTracking().ToListAsync(Ct)));
+
+        // Every dog has at least one owner, and every link is an owner (the only role in V1.x).
+        Assert.All(dogs, d => Assert.Contains(links, m => m.DogId == d.Id));
+        Assert.All(links, m => Assert.Equal(DogMemberRole.Owner, m.Role));
 
         Assert.Equal(users.Count, users.Select(u => u.ProviderSubject).Distinct().Count());
         Assert.All(users, u =>
@@ -201,7 +210,7 @@ public sealed class DemoDataInvariantTests(ApiFixture fixture) : DemoDataTestBas
             Assert.InRange(u.Bio.Length, 0, User.BioMaxLength);
             Assert.Null(u.Email);
             Assert.Equal(UserStatus.Active, u.Status);
-            var count = dogs.Count(d => d.OwnerId == u.Id);
+            var count = links.Count(m => m.UserId == u.Id);
             Assert.InRange(count, educators.Contains(u.Id) ? 0 : 1, educators.Contains(u.Id) ? 2 : 3);
         });
         Assert.True(users.Count(u => u.Bio.Length > 0) > users.Count / 2);
@@ -221,6 +230,34 @@ public sealed class DemoDataInvariantTests(ApiFixture fixture) : DemoDataTestBas
         Assert.All(Enum.GetValues<DogSize>(), size => Assert.True(dogs.Count(d => d.Size == size) >= 15));
         Assert.Contains(dogs, d => d.BirthDate > today.AddYears(-1));
         Assert.Contains(dogs, d => d.BirthDate < today.AddYears(-11));
+    }
+
+    [Fact]
+    public async Task A_shared_dog_is_registered_by_its_other_owner_and_its_first_owner_sees_it()
+    {
+        await GenerateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var (links, registrations) = await WithDbAsync(async db => (
+            await db.DogMembers.AsNoTracking().ToListAsync(Ct),
+            await db.Registrations.AsNoTracking().Include(r => r.Walk)
+                .Where(r => r.Status == RegistrationStatus.Accepted || r.Status == RegistrationStatus.Pending).ToListAsync(Ct)));
+
+        // A dog with two humans, registered to an upcoming walk by the one who joined second.
+        var shared = links.GroupBy(m => m.DogId).Where(g => g.Count() == 2).ToList();
+        Assert.NotEmpty(shared);
+        var (registration, firstOwnerId) = shared
+            .SelectMany(g => registrations
+                .Where(r => r.DogId == g.Key && r.Walk.StartsAt > now && r.UserId == g.OrderBy(m => m.CreatedAt).Last().UserId)
+                .Select(r => (Registration: r, FirstOwnerId: g.OrderBy(m => m.CreatedAt).First().UserId)))
+            .First();
+
+        // Signed in as the first owner, the walk shows the registration and who made it.
+        var subject = await WithDbAsync(db => db.Users.Where(u => u.Id == firstOwnerId).Select(u => u.ProviderSubject).SingleAsync(Ct));
+        var client = await SignInAsDemoAsync(subject);
+        var walk = await client.GetFromJsonAsync<WalkDetailResponse>($"/api/v1/walks/{registration.WalkId}", Json, Ct);
+        var seen = Assert.Single(walk!.MyDogsRegistrations, r => r.DogId == registration.DogId);
+        Assert.Equal((registration.Id, registration.UserId), (seen.Id, seen.RegisteredBy.Id));
+        Assert.DoesNotContain(walk.MyRegistrations, r => r.Id == registration.Id);
     }
 
     /// <summary>Great-circle distance from Seppois-le-Haut, in kilometres.</summary>

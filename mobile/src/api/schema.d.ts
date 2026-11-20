@@ -167,7 +167,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the signed-in user's dogs. */
+        /** List the dogs the signed-in user is an owner of, each with all its humans. */
         get: operations["listMyDogs"];
         put?: never;
         post?: never;
@@ -186,7 +186,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create a dog owned by the signed-in user (20 dogs at most per account). */
+        /** Create a dog; the signed-in user becomes its owner (20 dogs at most per human, shared dogs included). */
         post: operations["createDog"];
         delete?: never;
         options?: never;
@@ -201,16 +201,102 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a dog. */
+        /** Get a dog with its humans. */
         get: operations["getDog"];
         put?: never;
         post?: never;
-        /** Delete one of the signed-in user's dogs. */
+        /** Delete a dog. Reserved to its last owner: 409 dog.has_other_owners while another owner remains. */
         delete: operations["deleteDog"];
         options?: never;
         head?: never;
-        /** Update one of the signed-in user's dogs. The size cannot change while the dog is registered to an upcoming walk that does not allow the new size. */
+        /** Update a dog (any of its owners). The size cannot change while the dog is registered to an upcoming walk that does not allow the new size. */
         patch: operations["updateDog"];
+        trace?: never;
+    };
+    "/api/v1/dogs/{id}/members/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Stop being one of the dog's humans. 409 dog.last_owner for its last owner, who can only delete it. Registrations already made are kept. */
+        delete: operations["leaveDog"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dogs/{id}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pending invitations of the dog (owners only), oldest first, without their tokens. */
+        get: operations["listDogInvitations"];
+        put?: never;
+        /** Create an invitation to the dog (any of its owners). Returns the token and the link uzu://invitation/{token}, once; valid 7 days, single use. Only the Owner role is accepted. */
+        post: operations["createDogInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dogs/{id}/invitations/{invitationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke an invitation of the dog that has not been used (owners only). Idempotent. */
+        delete: operations["revokeDogInvitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dog-invitations/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Look at an invitation before accepting it: the dog, who invited, the role offered. Gives no right on the dog. */
+        get: operations["getDogInvitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dog-invitations/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept an invitation: the signed-in user becomes one of the dog's humans. Returns the dog. */
+        post: operations["acceptDogInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/me/photo": {
@@ -343,7 +429,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register one or more of the signed-in user's dogs to a walk; all or none are registered. */
+        /** Register one or more dogs the signed-in user is an owner of to a walk; all or none are registered. The signed-in user is the human who comes with them. */
         post: operations["createRegistrations"];
         delete?: never;
         options?: never;
@@ -361,7 +447,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Cancel one of the signed-in user's registrations before the walk starts. Idempotent. */
+        /** Cancel a registration before the walk starts: its author or any owner of the dog. When another owner cancels, the author is notified. Idempotent. */
         delete: operations["cancelRegistration"];
         options?: never;
         head?: never;
@@ -832,6 +918,9 @@ export interface components {
             /** Format: uuid */
             userId: string;
         };
+        CreateDogInvitationRequest: {
+            role: components["schemas"]["DogMemberRole"];
+        };
         CreateDogRequest: {
             name: string;
             size: components["schemas"]["DogSize"];
@@ -882,6 +971,19 @@ export interface components {
             repeatWeekly?: boolean;
             /** Format: uuid */
             organizationId?: null | string;
+        };
+        CreatedDogInvitationResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            dogId: string;
+            role: components["schemas"]["DogMemberRole"];
+            token: string;
+            link: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         /** @enum {string} */
         DemoAccountKind: "Owner" | "Educator";
@@ -945,12 +1047,37 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        DogInvitationPreviewResponse: {
+            dog: components["schemas"]["DogResponse"];
+            invitedBy: null | components["schemas"]["UserSummaryResponse"];
+            role: components["schemas"]["DogMemberRole"];
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        DogInvitationResponse: {
+            /** Format: uuid */
+            id: string;
+            role: components["schemas"]["DogMemberRole"];
+            createdBy: null | components["schemas"]["UserSummaryResponse"];
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
         DogMemberResponse: {
             user: components["schemas"]["UserSummaryResponse"];
             role: components["schemas"]["DogMemberRole"];
         };
         /** @enum {string} */
         DogMemberRole: "Owner";
+        DogRegistrationResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            dogId: string;
+            status: components["schemas"]["RegistrationStatus"];
+            registeredBy: components["schemas"]["UserSummaryResponse"];
+        };
         DogResponse: {
             /** Format: uuid */
             id: string;
@@ -1303,6 +1430,7 @@ export interface components {
             participants: components["schemas"]["ParticipantResponse"][];
             myRegistrations: components["schemas"]["MyRegistrationResponse"][];
             pendingRegistrations: components["schemas"]["ParticipantResponse"][];
+            myDogsRegistrations: components["schemas"]["DogRegistrationResponse"][];
         };
         WalkListItemResponse: {
             /** Format: uuid */
@@ -2064,6 +2192,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
         };
     };
     updateDog: {
@@ -2128,6 +2265,355 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    leaveDog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    listDogInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DogInvitationResponse"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    createDogInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDogInvitationRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedDogInvitationResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    revokeDogInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                invitationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    getDogInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DogInvitationPreviewResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    acceptDogInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DogResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };

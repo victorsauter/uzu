@@ -126,7 +126,9 @@ internal static class DemoWalks
             "On monte vers la forêt au petit jour, café offert à l'arrivée.",
             "Chiens moyens et grands. Liberté possible dans la forêt si le rappel est solide.",
             DemoPlaces.SeppoisForest, 7, new(8, 0), 90, 6, MediumAndLarge, OffLeashAllowed, Open, 3,
-            OrganizerDogs: true),
+            // Laura Petit brings Oscar, the dog she shares with Romain Gasser (DemoCommunity.SharedDogs):
+            // signed in as Romain, this walk shows « Déjà inscrit par Laura ».
+            OrganizerDogs: true, With: ["laura-petit"]),
         new("up-chapels", "gerard-koenig", "Boucle des chapelles",
             "Environ 7 km par les chemins de campagne, avec une montée vers la chapelle. Marcheurs sans chien bienvenus.",
             "Laisse obligatoire près des pâtures. Départ à l'heure pour rentrer avant la nuit.",

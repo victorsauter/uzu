@@ -1,3 +1,4 @@
+using Dogo.Api.Features.Dogs;
 using Dogo.Api.Features.Users;
 using Dogo.Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -86,15 +87,20 @@ internal static class WalkQueries
             return null;
         }
 
+        // Pending registrations are visible to the organizer, to their author and to the owners of
+        // the dog (spec §4.3, ADR 0042).
         var isOrganizer = row.Walk.OrganizerId == viewerId;
         var registrations = await db.Registrations.AsNoTracking()
             .Where(r => r.WalkId == id
                 && (r.Status == RegistrationStatus.Accepted
                     || r.UserId == viewerId
-                    || (isOrganizer && r.Status == RegistrationStatus.Pending)))
-            .Include(r => r.Dog).ThenInclude(d => d!.Owner)
+                    || (isOrganizer && r.Status == RegistrationStatus.Pending)
+                    || (r.Status == RegistrationStatus.Pending
+                        && r.Dog!.Members.Any(m => m.UserId == viewerId && m.Role == DogMemberRole.Owner))))
+            .Include(r => r.Dog).ThenInclude(d => d!.Members).ThenInclude(m => m.User)
             .Include(r => r.User)
             .OrderBy(r => r.CreatedAt).ThenBy(r => r.Id)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
         // Registrations of a deleted dog (only possible on past walks) have no dog to show.
@@ -111,6 +117,13 @@ internal static class WalkQueries
 
         var mine = registrations.Where(r => r.UserId == viewerId).Select(MyRegistrationResponse.From).ToList();
 
-        return WalkDetailResponse.From(row, LaterLotFields.For(row), isOrganizer, participants, mine, pending);
+        // Active registrations of the viewer's dogs, whoever made them: « Déjà inscrit par … ».
+        var myDogs = registrations
+            .Where(r => r.IsActive && r.Dog is not null
+                && r.Dog.Members.Any(m => m.UserId == viewerId && m.Role == DogMemberRole.Owner))
+            .Select(DogRegistrationResponse.From)
+            .ToList();
+
+        return WalkDetailResponse.From(row, LaterLotFields.For(row), isOrganizer, participants, mine, pending, myDogs);
     }
 }

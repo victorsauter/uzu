@@ -31,6 +31,7 @@ internal sealed class DemoDataSet
 {
     public List<User> Users { get; } = [];
     public List<Dog> Dogs { get; } = [];
+    public List<DogMember> DogMembers { get; } = [];
     public List<Organization> Organizations { get; } = [];
     public List<Membership> Memberships { get; } = [];
     public List<WalkSeries> Series { get; } = [];
@@ -75,6 +76,7 @@ internal sealed class DemoDataBuilder
     private readonly Dictionary<Guid, HashSet<Guid>> _acceptedMembers = [];
     private readonly Dictionary<Guid, HashSet<Guid>> _blockedBy = [];
     private readonly Dictionary<Guid, List<(DateTimeOffset Start, DateTimeOffset End)>> _busy = [];
+    private readonly Dictionary<Guid, List<(DateTimeOffset Start, DateTimeOffset End)>> _busyDogs = [];
     private readonly Dictionary<string, Walk> _walksByKey = [];
 
     private DemoDataBuilder(DateTimeOffset now)
@@ -136,7 +138,6 @@ internal sealed class DemoDataBuilder
                     : throw new InvalidOperationException($"Unknown demo breed '{spec.Breed}'.");
                 var dog = new Dog
                 {
-                    OwnerId = user.Id,
                     Name = spec.Name,
                     Size = breed.Size,
                     Breed = spec.Breed,
@@ -149,10 +150,33 @@ internal sealed class DemoDataBuilder
                 Created(dog, joined.AddDays(1 + d).AddMinutes(17));
                 dogs.Add(dog);
                 _set.Dogs.Add(dog);
+                AddDogMember(dog, user, _set.CreatedAt[dog]);
             }
 
             _dogsByOwner.Add(user.Id, dogs);
         }
+
+        // Dogs shared by two people: the co-owner can register them too (after their own dogs).
+        foreach (var shared in DemoCommunity.SharedDogs)
+        {
+            var dog = _dogsByOwner[_users[shared.Owner].Id].Single(d => d.Name == shared.Name);
+            var coOwner = _users[shared.CoOwner];
+            var linkedAt = _now.AddDays(-shared.DaysAgo);
+            if (linkedAt <= _set.CreatedAt[dog] || linkedAt <= _set.CreatedAt[coOwner])
+            {
+                throw new InvalidOperationException($"Shared demo dog '{shared.Name}' is linked before it or its co-owner exists.");
+            }
+
+            AddDogMember(dog, coOwner, linkedAt);
+            _dogsByOwner[coOwner.Id].Add(dog);
+        }
+    }
+
+    private void AddDogMember(Dog dog, User user, DateTimeOffset createdAt)
+    {
+        var member = new DogMember { DogId = dog.Id, UserId = user.Id, Role = DogMemberRole.Owner };
+        Created(member, createdAt);
+        _set.DogMembers.Add(member);
     }
 
     private void AddOrganizations()
@@ -312,7 +336,7 @@ internal sealed class DemoDataBuilder
 
         if (template.OrganizerDogs)
         {
-            foreach (var dog in _dogsByOwner[organizerId].Where(d => walk.AllowedSizes.Contains(d.Size)).Take(2))
+            foreach (var dog in _dogsByOwner[organizerId].Where(d => walk.AllowedSizes.Contains(d.Size) && !IsDogBusy(d.Id, walk)).Take(2))
             {
                 if (accepted.Count < template.Accepted)
                 {
@@ -391,6 +415,10 @@ internal sealed class DemoDataBuilder
             var registration = new Registration { WalkId = walk.Id, DogId = dog.Id, UserId = userId, Status = status };
             Created(registration, userId == organizerId ? createdAt.AddMinutes(1) : createdAt + (step * (r + 1)));
             _set.Registrations.Add(registration);
+            if (registration.IsActive)
+            {
+                MarkBusy(_busyDogs, dog.Id, walk);
+            }
         }
 
         foreach (var (message, at) in messages)
@@ -419,8 +447,12 @@ internal sealed class DemoDataBuilder
             .Where(id => walk.OrganizationId is not { } org || _acceptedMembers[org].Contains(id));
     }
 
+    /// <summary>
+    /// The user's dogs (shared ones included) that the walk allows, not registered to it yet, and not
+    /// brought by another of their owners to an overlapping walk.
+    /// </summary>
     private List<Dog> EligibleDogs(Guid userId, Walk walk, HashSet<Guid> registered) =>
-        _dogsByOwner[userId].Where(d => walk.AllowedSizes.Contains(d.Size) && !registered.Contains(d.Id)).ToList();
+        _dogsByOwner[userId].Where(d => walk.AllowedSizes.Contains(d.Size) && !registered.Contains(d.Id) && !IsDogBusy(d.Id, walk)).ToList();
 
     /// <summary>
     /// Messages of a thread, written by the organizer and accepted participants, strictly before
@@ -527,22 +559,29 @@ internal sealed class DemoDataBuilder
     private DateTimeOffset DefaultCreatedAt(DateTimeOffset start, int index) =>
         Min(start.AddDays(-(6 + (index % 5))), _now.AddDays(-(5 + (index % 6))).AddHours(-index));
 
-    private void MarkBusy(Guid userId, Walk walk)
+    private void MarkBusy(Guid userId, Walk walk) => MarkBusy(_busy, userId, walk);
+
+    private static void MarkBusy(Dictionary<Guid, List<(DateTimeOffset Start, DateTimeOffset End)>> busy, Guid id, Walk walk)
     {
-        if (!_busy.TryGetValue(userId, out var slots))
+        if (!busy.TryGetValue(id, out var slots))
         {
-            _busy[userId] = slots = [];
+            busy[id] = slots = [];
         }
 
         slots.Add((walk.StartsAt, walk.StartsAt.AddMinutes(walk.DurationMinutes)));
     }
 
     /// <summary>Someone already at another walk (organizing or registered) overlapping this one, with half an hour to get there.</summary>
-    private bool IsBusy(Guid userId, Walk walk)
+    private bool IsBusy(Guid userId, Walk walk) => IsBusy(_busy, userId, walk);
+
+    /// <summary>A dog already registered to an overlapping walk, possibly by another of its owners.</summary>
+    private bool IsDogBusy(Guid dogId, Walk walk) => IsBusy(_busyDogs, dogId, walk);
+
+    private static bool IsBusy(Dictionary<Guid, List<(DateTimeOffset Start, DateTimeOffset End)>> busy, Guid id, Walk walk)
     {
         var start = walk.StartsAt.AddMinutes(-30);
         var end = walk.StartsAt.AddMinutes(walk.DurationMinutes + 30);
-        return _busy.TryGetValue(userId, out var slots) && slots.Any(s => s.Start < end && start < s.End);
+        return busy.TryGetValue(id, out var slots) && slots.Any(s => s.Start < end && start < s.End);
     }
 
     private void Created(IHasCreatedAt entity, DateTimeOffset createdAt) => _set.CreatedAt[entity] = createdAt;

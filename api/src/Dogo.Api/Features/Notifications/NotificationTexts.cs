@@ -39,6 +39,7 @@ internal static class NotificationTexts
         [NotificationType.RegistrationRequested] = (NotificationCategory.Registrations, c => new("Nouvelle demande", $"{c.ActorName} demande à participer à « {c.Subject.Name} ».")),
         [NotificationType.RegistrationAccepted] = (NotificationCategory.Registrations, c => new("Inscription acceptée", $"Ta participation à « {c.Subject.Name} » est confirmée.")),
         [NotificationType.RegistrationDeclined] = (NotificationCategory.Registrations, c => new("Inscription refusée", $"Ton inscription à « {c.Subject.Name} » n'a pas été retenue.")),
+        [NotificationType.RegistrationCancelledByOwner] = (NotificationCategory.Registrations, c => new("Inscription annulée", $"{c.ActorName} a annulé l'inscription de {c.Detail ?? "ton chien"} à « {c.Subject.Name} ».")),
         [NotificationType.WalkUpdated] = (NotificationCategory.WalkChanges, c => new("Balade modifiée", $"« {c.Subject.Name} » a changé : prévue le {c.When}.")),
         [NotificationType.WalkCancelled] = (NotificationCategory.WalkChanges, c => new("Balade annulée", $"« {c.Subject.Name} », prévue le {c.When}, est annulée.")),
         [NotificationType.MessagePosted] = (NotificationCategory.Messages, c => new(c.Subject.Name, $"{c.ActorName} : {Excerpt(c.Detail)}")),

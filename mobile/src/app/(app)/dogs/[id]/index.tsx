@@ -3,7 +3,13 @@ import { useRef, useState } from 'react';
 import { Alert, Pressable, View, type ScrollViewInstance } from 'react-native';
 
 import { useGuardedRouter } from '@/lib/navigation';
-import { useDeleteDog, useDog } from '@/api/dogs';
+import {
+  useDeleteDog,
+  useDog,
+  useDogInvitations,
+  useLeaveDog,
+  useRevokeDogInvitation,
+} from '@/api/dogs';
 import { errorMessage } from '@/api/errors';
 import { useSession } from '@/auth';
 import {
@@ -20,6 +26,7 @@ import {
   Text,
 } from '@/components';
 import { formatAge } from '@/lib/age';
+import { formatDate } from '@/lib/dates';
 import { humanNames, isDogOwner, listNames, withHumansPhrase } from '@/lib/dogMembers';
 import { useFocusedRouter } from '@/lib/hooks';
 import { reportHref } from '@/lib/report';
@@ -52,7 +59,12 @@ export default function DogDetailScreen() {
   const focusedRouter = useFocusedRouter();
   const dog = useDog(id);
   const deleteDog = useDeleteDog();
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const leaveDog = useLeaveDog(id);
+  const revokeInvitation = useRevokeDogInvitation(id);
+  const owner = dog.data ? isDogOwner(dog.data, user?.id) : false;
+  const invitations = useDogInvitations(id, owner);
+  // Refusal of delete, leave or cancel-invitation: the state may have changed meanwhile (409).
+  const [actionError, setActionError] = useState<string | null>(null);
 
   if (dog.isPending)
     return (
@@ -79,8 +91,16 @@ export default function DogDetailScreen() {
   const showHumans = () =>
     scrollRef.current?.scrollTo({ y: Math.max(0, humansTop.current - spacing.lg), animated: true });
 
+  const owners = data.members.filter((member) => member.role === 'Owner');
+  // Not the last owner: the dog stays with the others, so « Ne plus m'occuper » replaces « Supprimer ».
+  const lastOwner = owners.length <= 1;
+  const otherOwners = humanNames(
+    owners.filter((member) => member.user.id !== user?.id),
+    user?.id,
+  );
+
   function confirmDelete() {
-    setDeleteError(null);
+    setActionError(null);
     Alert.alert(format(t.dog.deleteConfirmTitle, { name: data.name }), t.dog.deleteConfirmMessage, [
       { text: t.common.cancel, style: 'cancel' },
       {
@@ -89,7 +109,47 @@ export default function DogDetailScreen() {
         onPress: () => {
           deleteDog.mutate(data.id, {
             onSuccess: () => focusedRouter.back(),
-            onError: (error) => setDeleteError(errorMessage(error)),
+            onError: (error) => setActionError(errorMessage(error)),
+          });
+        },
+      },
+    ]);
+  }
+
+  function confirmLeave() {
+    setActionError(null);
+    Alert.alert(
+      format(t.dog.leaveConfirmTitle, { name: data.name }),
+      format(t.dog.leaveConfirmMessage, {
+        name: data.name,
+        others: listNames(otherOwners, 3),
+      }),
+      [
+        { text: t.common.cancel, style: 'cancel' },
+        {
+          text: t.dog.leaveConfirmAction,
+          style: 'destructive',
+          onPress: () => {
+            leaveDog.mutate(undefined, {
+              onSuccess: () => focusedRouter.back(),
+              onError: (error) => setActionError(errorMessage(error)),
+            });
+          },
+        },
+      ],
+    );
+  }
+
+  function confirmCancelInvitation(invitationId: string) {
+    setActionError(null);
+    Alert.alert(t.dog.cancelInvitationTitle, t.dog.cancelInvitationMessage, [
+      { text: t.dog.cancelInvitationKeep, style: 'cancel' },
+      {
+        text: t.dog.cancelInvitation,
+        style: 'destructive',
+        onPress: () => {
+          revokeInvitation.mutate(invitationId, {
+            onError: (error) => setActionError(errorMessage(error)),
           });
         },
       },
@@ -203,6 +263,80 @@ export default function DogDetailScreen() {
               </View>
             );
           })}
+          {mine
+            ? (invitations.data ?? []).map((invitation) => {
+                const text = format(t.dog.pendingInvitation, {
+                  date: formatDate(invitation.expiresAt),
+                });
+                return (
+                  <View
+                    key={invitation.id}
+                    style={{
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing.md,
+                      paddingVertical: spacing.sm,
+                      paddingHorizontal: spacing.lg,
+                    }}
+                  >
+                    <Text variant="caption" color="textMuted" style={{ flex: 1 }}>
+                      {text}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t.dog.cancelInvitation}, ${text}`}
+                      disabled={revokeInvitation.isPending}
+                      hitSlop={8}
+                      onPress={() => confirmCancelInvitation(invitation.id)}
+                    >
+                      <Text variant="caption" color="primary" style={{ fontWeight: '600' }}>
+                        {t.dog.cancelInvitation}
+                      </Text>
+                    </Pressable>
+                  </View>
+                );
+              })
+            : null}
+          {mine ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={format(t.dog.addHumanA11y, { name: data.name })}
+              onPress={() =>
+                router.push({ pathname: '/dogs/[id]/invite', params: { id: data.id } })
+              }
+              style={({ pressed }) => ({
+                minHeight: 56,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.md,
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.lg,
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+                backgroundColor: pressed ? colors.surfaceMuted : 'transparent',
+              })}
+            >
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  borderWidth: 1.5,
+                  borderStyle: 'dashed',
+                  borderColor: colors.primary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name="plus" size={18} color="primary" />
+              </View>
+              <Text variant="subheading" color="primary">
+                {t.dog.addHuman}
+              </Text>
+            </Pressable>
+          ) : null}
         </Card>
       </View>
 
@@ -221,15 +355,24 @@ export default function DogDetailScreen() {
             label={t.common.edit}
             onPress={() => router.push({ pathname: '/dogs/[id]/edit', params: { id: data.id } })}
           />
-          <Button
-            label={t.common.delete}
-            variant="danger"
-            loading={deleteDog.isPending}
-            onPress={confirmDelete}
-          />
-          {deleteError ? (
+          {lastOwner ? (
+            <Button
+              label={t.common.delete}
+              variant="danger"
+              loading={deleteDog.isPending}
+              onPress={confirmDelete}
+            />
+          ) : (
+            <Button
+              label={format(t.dog.leave, { name: data.name })}
+              variant="secondary"
+              loading={leaveDog.isPending}
+              onPress={confirmLeave}
+            />
+          )}
+          {actionError ? (
             <Text color="danger" accessibilityLiveRegion="polite">
-              {deleteError}
+              {actionError}
             </Text>
           ) : null}
         </View>

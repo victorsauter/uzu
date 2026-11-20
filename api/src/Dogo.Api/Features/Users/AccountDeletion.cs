@@ -1,3 +1,4 @@
+using Dogo.Api.Features.Dogs;
 using Dogo.Api.Features.Notifications;
 using Dogo.Api.Features.Organizations;
 using Dogo.Api.Features.Walks;
@@ -33,6 +34,20 @@ public sealed partial class AccountDeletion(
             return false;
         }
 
+        // The user's dogs are locked next (lock order: account, dogs, walks; ADR 0037, 0042), by
+        // increasing id: a co-owner leaving a shared dog at the same time either left first (and
+        // this user is then its last owner) or waits and finds this user gone. Only the dogs this
+        // user was the last owner of are deleted; the others stay with their other humans.
+        var linkedDogIds = await db.DogMembers.Where(m => m.UserId == userId).Select(m => m.DogId).ToListAsync(cancellationToken);
+        var lockedDogIds = linkedDogIds.Order().ToArray();
+        await db.Database.SqlQuery<Guid>($"SELECT id AS \"Value\" FROM dogs WHERE id = ANY({lockedDogIds}) ORDER BY id FOR UPDATE")
+            .ToListAsync(cancellationToken);
+        var lastOwnedDogs = await db.Dogs
+            .Where(d => lockedDogIds.Contains(d.Id)
+                && !d.Members.Any(m => m.UserId != userId && m.Role == DogMemberRole.Owner))
+            .Select(d => new { d.Id, d.PhotoFileName })
+            .ToListAsync(cancellationToken);
+
         // Upcoming walks are cancelled, as the organizer would (shared with the suspension).
         var cancelledWalks = await db.CancelUpcomingWalksAsync(userId, now, cancellationToken);
 
@@ -42,12 +57,17 @@ public sealed partial class AccountDeletion(
             .ExecuteUpdateAsync(s => s.SetProperty(w => w.OrganizerId, (Guid?)null), cancellationToken);
         await db.WalkSeries.Where(s => s.OrganizerId == userId).ExecuteDeleteAsync(cancellationToken);
 
-        // Registrations (which frees their places), dogs, devices, preferences and sessions.
-        var dogPhotos = await db.Dogs.Where(d => d.OwnerId == userId && d.PhotoFileName != null)
-            .Select(d => d.PhotoFileName!)
-            .ToListAsync(cancellationToken);
+        // Registrations (which frees their places), links to dogs, the dogs they were the last
+        // owner of (their upcoming registrations by anyone are cancelled, spec §4.1), devices,
+        // preferences and sessions. Dog invitations they created or accepted stay with the dog,
+        // without author (spec §4.8).
         await db.Registrations.Where(r => r.UserId == userId).ExecuteDeleteAsync(cancellationToken);
-        await db.Dogs.Where(d => d.OwnerId == userId).ExecuteDeleteAsync(cancellationToken);
+        await db.DogMembers.Where(m => m.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+        await DogEndpoints.DeleteLockedDogsAsync(db, lastOwnedDogs.Select(d => d.Id).ToList(), now, cancellationToken);
+        await db.DogInvitations.Where(i => i.CreatedById == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.CreatedById, (Guid?)null), cancellationToken);
+        await db.DogInvitations.Where(i => i.UsedById == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.UsedById, (Guid?)null), cancellationToken);
         await db.Devices.Where(d => d.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await db.NotificationPreferences.Where(p => p.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await db.RefreshTokens.Where(t => t.UserId == userId).ExecuteDeleteAsync(cancellationToken);
@@ -78,7 +98,7 @@ public sealed partial class AccountDeletion(
         LogDeleted(userId, cancelledWalks.Count, closedCount);
 
         // After the commit: photo files, then the registrants of the cancelled walks (spec §4.8).
-        foreach (var fileName in dogPhotos.Append(user.PhotoFileName).OfType<string>())
+        foreach (var fileName in lastOwnedDogs.Select(d => d.PhotoFileName).Append(user.PhotoFileName).OfType<string>())
         {
             await photos.DeleteAsync(fileName, cancellationToken);
         }

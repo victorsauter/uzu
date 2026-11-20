@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Dogo.Api.Common;
+using Dogo.Api.Features.Dogs;
 using Dogo.Api.Features.Notifications;
 using Dogo.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -16,7 +17,7 @@ public static class RegistrationEndpoints
 
         group.MapPost("", CreateRegistrations)
             .WithName("createRegistrations")
-            .WithSummary("Register one or more of the signed-in user's dogs to a walk; all or none are registered.")
+            .WithSummary("Register one or more dogs the signed-in user is an owner of to a walk; all or none are registered. The signed-in user is the human who comes with them.")
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -24,7 +25,7 @@ public static class RegistrationEndpoints
 
         group.MapDelete("/{registrationId:guid}", CancelRegistration)
             .WithName("cancelRegistration")
-            .WithSummary("Cancel one of the signed-in user's registrations before the walk starts. Idempotent.")
+            .WithSummary("Cancel a registration before the walk starts: its author or any owner of the dog. When another owner cancels, the author is notified. Idempotent.")
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
@@ -99,18 +100,27 @@ public static class RegistrationEndpoints
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> CancelRegistration(
-        Guid id, Guid registrationId, ClaimsPrincipal principal, DogoDbContext db, TimeProvider timeProvider, CancellationToken cancellationToken)
+        Guid id,
+        Guid registrationId,
+        ClaimsPrincipal principal,
+        DogoDbContext db,
+        TimeProvider timeProvider,
+        NotificationQueue notifications,
+        CancellationToken cancellationToken)
     {
-        var registration = await db.Registrations.Include(r => r.Walk)
+        var registration = await db.Registrations.Include(r => r.Walk).Include(r => r.Dog)
             .SingleOrDefaultAsync(r => r.Id == registrationId && r.WalkId == id, cancellationToken);
         if (registration is null)
         {
             return RegistrationNotFound();
         }
 
-        if (registration.UserId != principal.GetUserId())
+        // Spec §4.3: its author, or any owner of the dog (ADR 0042).
+        var userId = principal.GetUserId();
+        var byAuthor = registration.UserId == userId;
+        if (!byAuthor && (registration.DogId is not { } dogId || !await db.IsOwnerAsync(dogId, userId, cancellationToken)))
         {
-            return Problems.Forbidden(ErrorCodes.RegistrationForbidden, "Only the owner of the dog can cancel this registration.");
+            return Problems.Forbidden(ErrorCodes.RegistrationForbidden, "Only its author or an owner of the dog can cancel this registration.");
         }
 
         if (registration.Status == RegistrationStatus.Cancelled)
@@ -136,6 +146,18 @@ public static class RegistrationEndpoints
             return await CurrentStatusAsync(db, registrationId, cancellationToken) == RegistrationStatus.Cancelled
                 ? TypedResults.NoContent()
                 : NotActive();
+        }
+
+        // Spec §4.4: cancelled by another owner of the dog, the author is told, so as not to come to
+        // the walk believing the dog registered. The dog's name is in the text.
+        if (!byAuthor)
+        {
+            notifications.Enqueue(new NotificationRequest(
+                NotificationType.RegistrationCancelledByOwner,
+                NotificationSubject.ForWalk(registration.Walk),
+                userId,
+                [registration.UserId],
+                registration.Dog?.Name));
         }
 
         return TypedResults.NoContent();

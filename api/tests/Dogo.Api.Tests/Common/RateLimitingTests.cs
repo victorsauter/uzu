@@ -137,6 +137,21 @@ public sealed class RateLimitingTests(ApiFixture fixture) : ApiTestBase(fixture)
     }
 
     [Fact]
+    public async Task Dog_invitation_tokens_cannot_be_tried_in_bulk()
+    {
+        // ADR 0042: looking at an invitation is a read, but it takes a token: limited like a sensitive write.
+        await using var factory = Limited(("RateLimiting:SensitiveWrites:PermitLimit", "2"));
+        var alice = await SignedInAsync(factory, "alice");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await alice.GetAsync($"/api/v1/dog-invitations/{Guid.NewGuid():N}", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await alice.PostAsync($"/api/v1/dog-invitations/{Guid.NewGuid():N}/accept", null, Ct)).StatusCode);
+
+        await AssertRateLimitedAsync(await alice.GetAsync($"/api/v1/dog-invitations/{Guid.NewGuid():N}", Ct));
+        // Other reads are not concerned.
+        Assert.Equal(HttpStatusCode.OK, (await alice.GetAsync("/api/v1/me/dogs", Ct)).StatusCode);
+    }
+
+    [Fact]
     public void Every_sensitive_endpoint_name_exists()
     {
         // The sensitive writes are matched by operation id: a renamed endpoint must not slip out.

@@ -46,16 +46,16 @@ public sealed class Dog : IHasCreatedAt
     public const int DescriptionMaxLength = 1000;
 
     /// <summary>
-    /// How many dogs one account may have (409 <c>dog.limit_reached</c> beyond). Far above any real
-    /// household; it bounds the public profile, which lists every dog of a user without paging.
+    /// How many dogs one human may be linked to, shared dogs included (409 <c>dog.limit_reached</c>
+    /// beyond; ADR 0037, 0042). Far above any real household; it bounds the public profile, which
+    /// lists every dog of a user without paging.
     /// </summary>
     public const int MaxPerOwner = 20;
 
     public Guid Id { get; init; } = Guid.CreateVersion7();
 
-    public Guid OwnerId { get; init; }
-
-    public User Owner { get; init; } = null!;
+    /// <summary>The humans linked to the dog (ADR 0042); at least one owner while the dog exists.</summary>
+    public List<DogMember> Members { get; } = [];
 
     public required string Name { get; set; }
 
@@ -87,7 +87,5 @@ internal sealed class DogConfiguration : IEntityTypeConfiguration<Dog>
         builder.Property(d => d.Breed).HasMaxLength(Dog.BreedMaxLength);
         builder.Property(d => d.Description).HasMaxLength(Dog.DescriptionMaxLength);
         builder.Property(d => d.PhotoFileName).HasMaxLength(64);
-        builder.HasIndex(d => d.OwnerId);
-        builder.HasOne(d => d.Owner).WithMany(u => u.Dogs).HasForeignKey(d => d.OwnerId).OnDelete(DeleteBehavior.Cascade);
     }
 }

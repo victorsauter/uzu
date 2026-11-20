@@ -612,7 +612,7 @@
         "tags": [
           "Dogs"
         ],
-        "summary": "List the signed-in user's dogs.",
+        "summary": "List the dogs the signed-in user is an owner of, each with all its humans.",
         "operationId": "listMyDogs",
         "parameters": [
           {
@@ -674,7 +674,7 @@
         "tags": [
           "Dogs"
         ],
-        "summary": "Create a dog owned by the signed-in user (20 dogs at most per account).",
+        "summary": "Create a dog; the signed-in user becomes its owner (20 dogs at most per human, shared dogs included).",
         "operationId": "createDog",
         "requestBody": {
           "content": {
@@ -750,7 +750,7 @@
         "tags": [
           "Dogs"
         ],
-        "summary": "Get a dog.",
+        "summary": "Get a dog with its humans.",
         "operationId": "getDog",
         "parameters": [
           {
@@ -805,7 +805,7 @@
         "tags": [
           "Dogs"
         ],
-        "summary": "Update one of the signed-in user's dogs. The size cannot change while the dog is registered to an upcoming walk that does not allow the new size.",
+        "summary": "Update a dog (any of its owners). The size cannot change while the dog is registered to an upcoming walk that does not allow the new size.",
         "operationId": "updateDog",
         "parameters": [
           {
@@ -900,7 +900,7 @@
         "tags": [
           "Dogs"
         ],
-        "summary": "Delete one of the signed-in user's dogs.",
+        "summary": "Delete a dog. Reserved to its last owner: 409 dog.has_other_owners while another owner remains.",
         "operationId": "deleteDog",
         "parameters": [
           {
@@ -939,6 +939,482 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/dogs/{id}/members/me": {
+      "delete": {
+        "tags": [
+          "Dogs"
+        ],
+        "summary": "Stop being one of the dog's humans. 409 dog.last_owner for its last owner, who can only delete it. Registrations already made are kept.",
+        "operationId": "leaveDog",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/dogs/{id}/invitations": {
+      "post": {
+        "tags": [
+          "Dogs"
+        ],
+        "summary": "Create an invitation to the dog (any of its owners). Returns the token and the link uzu://invitation/{token}, once; valid 7 days, single use. Only the Owner role is accepted.",
+        "operationId": "createDogInvitation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDogInvitationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedDogInvitationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Dogs"
+        ],
+        "summary": "Pending invitations of the dog (owners only), oldest first, without their tokens.",
+        "operationId": "listDogInvitations",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DogInvitationResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/dogs/{id}/invitations/{invitationId}": {
+      "delete": {
+        "tags": [
+          "Dogs"
+        ],
+        "summary": "Revoke an invitation of the dog that has not been used (owners only). Idempotent.",
+        "operationId": "revokeDogInvitation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/dog-invitations/{token}": {
+      "get": {
+        "tags": [
+          "Dogs"
+        ],
+        "summary": "Look at an invitation before accepting it: the dog, who invited, the role offered. Gives no right on the dog.",
+        "operationId": "getDogInvitation",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DogInvitationPreviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/v1/dog-invitations/{token}/accept": {
+      "post": {
+        "tags": [
+          "Dogs"
+        ],
+        "summary": "Accept an invitation: the signed-in user becomes one of the dog's humans. Returns the dog.",
+        "operationId": "acceptDogInvitation",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DogResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1729,7 +2205,7 @@
         "tags": [
           "Registrations"
         ],
-        "summary": "Register one or more of the signed-in user's dogs to a walk; all or none are registered.",
+        "summary": "Register one or more dogs the signed-in user is an owner of to a walk; all or none are registered. The signed-in user is the human who comes with them.",
         "operationId": "createRegistrations",
         "parameters": [
           {
@@ -1829,7 +2305,7 @@
         "tags": [
           "Registrations"
         ],
-        "summary": "Cancel one of the signed-in user's registrations before the walk starts. Idempotent.",
+        "summary": "Cancel a registration before the walk starts: its author or any owner of the dog. When another owner cancels, the author is notified. Idempotent.",
         "operationId": "cancelRegistration",
         "parameters": [
           {
@@ -4369,6 +4845,17 @@
           }
         }
       },
+      "CreateDogInvitationRequest": {
+        "required": [
+          "role"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/DogMemberRole"
+          }
+        }
+      },
       "CreateDogRequest": {
         "required": [
           "name",
@@ -4593,6 +5080,45 @@
           }
         }
       },
+      "CreatedDogInvitationResponse": {
+        "required": [
+          "id",
+          "dogId",
+          "role",
+          "token",
+          "link",
+          "expiresAt",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dogId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/DogMemberRole"
+          },
+          "token": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "DemoAccountKind": {
         "enum": [
           "Owner",
@@ -4808,6 +5334,74 @@
           }
         }
       },
+      "DogInvitationPreviewResponse": {
+        "required": [
+          "dog",
+          "invitedBy",
+          "role",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "dog": {
+            "$ref": "#/components/schemas/DogResponse"
+          },
+          "invitedBy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UserSummaryResponse"
+              }
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/DogMemberRole"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DogInvitationResponse": {
+        "required": [
+          "id",
+          "role",
+          "createdBy",
+          "expiresAt",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/DogMemberRole"
+          },
+          "createdBy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UserSummaryResponse"
+              }
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "DogMemberResponse": {
         "required": [
           "user",
@@ -4828,6 +5422,31 @@
           "Owner"
         ],
         "type": "string"
+      },
+      "DogRegistrationResponse": {
+        "required": [
+          "id",
+          "dogId",
+          "status",
+          "registeredBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dogId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "registeredBy": {
+            "$ref": "#/components/schemas/UserSummaryResponse"
+          }
+        }
       },
       "DogResponse": {
         "required": [
@@ -6167,7 +6786,8 @@
           "isOrganizer",
           "participants",
           "myRegistrations",
-          "pendingRegistrations"
+          "pendingRegistrations",
+          "myDogsRegistrations"
         ],
         "type": "object",
         "properties": {
@@ -6273,6 +6893,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ParticipantResponse"
+            }
+          },
+          "myDogsRegistrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DogRegistrationResponse"
             }
           }
         }

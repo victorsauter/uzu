@@ -155,7 +155,8 @@ public sealed record WalkDetailResponse(
     bool IsOrganizer,
     IReadOnlyList<ParticipantResponse> Participants,
     IReadOnlyList<MyRegistrationResponse> MyRegistrations,
-    IReadOnlyList<ParticipantResponse> PendingRegistrations)
+    IReadOnlyList<ParticipantResponse> PendingRegistrations,
+    IReadOnlyList<DogRegistrationResponse> MyDogsRegistrations)
 {
     internal static WalkDetailResponse From(
         WalkRow row,
@@ -163,7 +164,8 @@ public sealed record WalkDetailResponse(
         bool isOrganizer,
         IReadOnlyList<ParticipantResponse> participants,
         IReadOnlyList<MyRegistrationResponse> myRegistrations,
-        IReadOnlyList<ParticipantResponse> pendingRegistrations) => new(
+        IReadOnlyList<ParticipantResponse> pendingRegistrations,
+        IReadOnlyList<DogRegistrationResponse> myDogsRegistrations) => new(
         row.Walk.Id,
         row.Walk.Title,
         row.Walk.Description,
@@ -187,7 +189,20 @@ public sealed record WalkDetailResponse(
         isOrganizer,
         participants,
         myRegistrations,
-        pendingRegistrations);
+        pendingRegistrations,
+        myDogsRegistrations);
+}
+
+/// <summary>
+/// An active (<c>Pending</c> or <c>Accepted</c>) registration of one of the dogs the signed-in user
+/// is an owner of, whoever made it (ADR 0042): <c>registeredBy</c> is the human who comes with the
+/// dog. Lets the app show « Déjà inscrit par Camille » and offer to cancel it (any owner may).
+/// </summary>
+public sealed record DogRegistrationResponse(Guid Id, Guid DogId, RegistrationStatus Status, UserSummaryResponse RegisteredBy)
+{
+    /// <summary>Requires <see cref="Registration.User"/> to be loaded, and the dog not deleted.</summary>
+    internal static DogRegistrationResponse From(Registration registration) =>
+        new(registration.Id, registration.DogId!.Value, registration.Status, UserSummaryResponse.From(registration.User));
 }
 
 /// <summary>A registered dog with its owner: accepted participants, or pending requests for the organizer.</summary>

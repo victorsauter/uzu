@@ -16,7 +16,7 @@ export { DateTimeField, type DateTimeFieldProps } from './DateTimeField';
 export { DogCard, dogSummary } from './DogCard';
 export { DogForm, type DogFormProps } from './DogForm';
 export { EmptyState, type EmptyStateProps, type StateAction } from './EmptyState';
-export { ErrorState, type ErrorStateProps } from './ErrorState';
+export { ErrorState, leaveScreen, type ErrorStateProps } from './ErrorState';
 export {
   createFieldRegistry,
   FieldAnchor,

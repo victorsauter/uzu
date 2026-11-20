@@ -39,13 +39,23 @@ Sur le profil d'un humain, la carte d'un chien partagé affiche « aussi avec {p
 
 ## Conséquences
 
-- **Migration.** `dogs.owner_id` est remplacé par la table `dog_members`. Comme la V1 n'est pas déployée, la migration (ou la régénération de la migration initiale) n'a pas de données de production à reprendre : un chien créé reçoit son lien `Owner`. Les données de démonstration (`DemoDataBuilder`, `DemoDataService`) et les tests qui lisent `OwnerId` sont à adapter.
+- **Migration.** `dogs.owner_id` est remplacé par la table `dog_members`. Comme la V1 n'est pas déployée, la migration n'a pas de données de production à reprendre ; elle reprend toutefois les bases locales (voir « Précisions de l'implémentation »). Un chien créé reçoit son lien `Owner`. Les données de démonstration (`DemoDataBuilder`, `DemoDataService`) et les tests qui lisent `OwnerId` sont à adapter.
 - **Autorisations.** `FindOwnedDogAsync` vérifie un lien `Owner` au lieu de `OwnerId` ; le filtre d'inscription (`RegistrationRules`) fait de même ; l'annulation d'une inscription accepte son auteur ou un propriétaire du chien.
 - **ADR 0037 précisé.** Le plafond de 20 se compte désormais sur les liens de l'humain, pas sur les chiens qu'il a créés. Créer un chien et accepter une invitation verrouillent donc la ligne du compte pour que le plafond tienne. L'ordre des verrous reste : compte, chiens, puis balades. Ne plus s'occuper d'un chien, le supprimer et accepter une invitation verrouillent le chien (`FOR UPDATE`) pour que l'invariant « au moins un propriétaire » tienne quand deux propriétaires partent en même temps.
 - **ADR 0023 précisé.** La suppression de compte supprime des liens, et ne supprime un chien que si l'utilisateur en était le dernier propriétaire. Ses inscriptions sont supprimées comme avant, y compris celles qu'il avait faites pour un chien partagé : l'autre propriétaire peut réinscrire le chien. Les invitations qu'il a créées ou acceptées sont détachées (`createdById` et `usedById` nuls) plutôt que supprimées.
 - **Blocage contournable par un chien partagé.** Un humain bloqué ne peut pas s'inscrire, mais un autre propriétaire de son chien peut l'inscrire. C'est assumé : le blocage vise une personne, pas un chien.
 - **Compte suspendu.** Ses liens sont conservés, les autres propriétaires peuvent continuer à inscrire le chien.
 - **Spécification et contrat.** `docs/specification-v1.md` passe en version 0.3 ; `api/openapi.json` et le client mobile devront être régénérés à l'implémentation.
+
+## Précisions de l'implémentation (API)
+
+- **Migration.** La sixième migration (`AddDogMembersAndInvitations`) crée `dog_members` et `dog_invitations`, copie chaque `dogs.owner_id` en lien `Owner` daté comme le chien, puis supprime `owner_id`, son index et sa clé étrangère : les bases locales existantes sont reprises. Le retour arrière remet le propriétaire du lien le plus ancien.
+- **Jeton.** 32 octets d'un générateur cryptographique, encodés en base64url sans remplissage (43 caractères) ; empreinte SHA-256 en hexadécimal, index unique. Un jeton mal formé répond `invitation.not_found`. Réponse de création : `{ id, dogId, role, token, link, expiresAt, createdAt }`.
+- **Verrous.** Accepter prend la ligne du compte (`FOR UPDATE`, plafond), puis celle du chien, puis celle de l'invitation : supprimer un chien verrouille le chien avant que ses invitations ne partent en cascade, l'invitation n'est donc jamais verrouillée en premier. La suppression de compte verrouille ses chiens, par identifiant croissant, juste après la ligne du compte et avant les balades.
+- **Limitation de débit.** La création d'invitation, la consultation et l'acceptation par jeton comptent comme écritures sensibles (ADR 0031) ; la consultation est une lecture, mais elle prend un jeton : la règle « sensible » ne regarde plus la méthode, seulement le nom du point d'entrée.
+- **Fiche d'une balade.** `WalkDetailResponse.myDogsRegistrations` liste les inscriptions `Pending` et `Accepted` des chiens dont l'utilisateur est propriétaire, quel que soit leur auteur : `{ id, dogId, status, registeredBy }`. `myRegistrations` est inchangé. `GET /me/walks?role=Participant` reste fondé sur `Registration.userId` : un chien inscrit par un autre propriétaire n'y figure pas.
+- **Notification.** Type `registration_cancelled_by_owner`, préférence `registrations` : « Inscription annulée » / « {nom} a annulé l'inscription de {chien} à « {titre} ». ».
+- **Données de démonstration.** Romain Gasser et Laura Petit partagent Oscar ; Laura l'inscrit à « Cani-balade au lever du soleil ».
 
 ## Questions ouvertes
 

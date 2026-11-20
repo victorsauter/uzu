@@ -227,6 +227,10 @@ export const fr = {
     sizeNotAllowed: 'Gabarit non admis ({size})',
     alreadyRegistered: 'Déjà inscrit',
     alreadyPending: 'Demande en attente',
+    /** My dog, registered by another of its owners. */
+    alreadyRegisteredBy: 'Déjà inscrit par {name}',
+    alreadyPendingBy: 'Demande envoyée par {name}',
+    registeredBy: 'par {name}',
     noDogTitle: 'Tu n’as pas encore de chien',
     noDogMessage: 'Ajoute ton chien pour pouvoir l’inscrire.',
     addDog: 'Ajouter un chien',
@@ -237,6 +241,8 @@ export const fr = {
     cancelRegistration: 'Annuler l’inscription',
     cancelRegistrationTitle: 'Annuler l’inscription de {name} ?',
     cancelRegistrationMessage: 'Sa place sera libérée.',
+    /** Cancelling a registration another owner of my dog made: they are told. */
+    cancelRegistrationOfOtherMessage: 'Sa place sera libérée. {name} sera prévenu.',
     keep: 'Garder',
     deletedDog: 'Chien supprimé',
     membersOnlyTitle: 'Balade réservée aux membres',
@@ -428,6 +434,20 @@ export const fr = {
     humansOf: 'Humains de {name} : {names}',
     humansScrollHint: 'Aller à la liste de ses humains',
     memberA11y: '{name}, {role}',
+    /** Last line of « Ses humains » for an owner: opens the invitation sheet. */
+    addHuman: 'Ajouter un humain',
+    addHumanA11y: 'Ajouter un humain à {name}',
+    pendingInvitation: 'Invitation en attente · expire le {date}',
+    cancelInvitation: 'Annuler l’invitation',
+    cancelInvitationTitle: 'Annuler cette invitation ?',
+    cancelInvitationMessage: 'Le lien partagé ne fonctionnera plus.',
+    cancelInvitationKeep: 'Garder',
+    /** Button for an owner who is not the last one; the dog stays with the others. */
+    leave: 'Ne plus m’occuper de {name}',
+    leaveConfirmTitle: 'Ne plus t’occuper de {name} ?',
+    leaveConfirmMessage:
+      '{name} restera avec {others}. Tu ne pourras plus le modifier ni l’inscrire.',
+    leaveConfirmAction: 'Ne plus m’en occuper',
     summary: '{size} · {sociability}',
     deleteConfirmTitle: 'Supprimer {name} ?',
     deleteConfirmMessage: 'Ses inscriptions à venir seront annulées. Cette action est définitive.',
@@ -437,6 +457,44 @@ export const fr = {
     photoLater: 'Plus tard',
     createdPhotoFailed:
       'Le chien est enregistré, mais la photo n’a pas pu être envoyée. Ajoute-la depuis sa fiche.',
+  },
+  /** Inviting a human to a dog (sheet) and accepting such an invitation (ADR 0042). */
+  dogInvitation: {
+    sheetTitle: 'Ajouter un humain à {name}',
+    roleTitle: 'Son rôle',
+    roleOwner: 'Propriétaire',
+    roleOwnerHint: 'Modifie {name} et l’inscrit à des balades',
+    roleTrusted: 'Personne de confiance',
+    roleTrustedHint: 'L’inscrit à des balades, sans le modifier',
+    roleEducator: 'Éducateur',
+    roleEducatorHint: 'Affiché sur son profil, sans droits',
+    soon: 'Bientôt',
+    share: 'Partager le lien d’invitation',
+    help: 'La personne doit accepter. Le lien expire après 7 jours et ne sert qu’une fois.',
+    /** Text handed to the system share sheet; `{link}` is `uzu://invitation/{token}`. */
+    shareMessage: 'Rejoins {name} sur Uzu : {link}',
+    shareSubject: 'Invitation à rejoindre {name} sur Uzu',
+    // Acceptance screen
+    screenTitle: 'Invitation',
+    invitedBy: '{inviter} t’invite à rejoindre {name}',
+    invitedByUnknown: 'Tu es invité à rejoindre {name}',
+    roleOffered: 'Rôle proposé : {role}',
+    expiresOn: 'Valable jusqu’au {date}',
+    humansOf: 'Humains de {name} : {names}',
+    accept: 'Accepter',
+    later: 'Plus tard',
+    notFoundTitle: 'Invitation introuvable',
+    notFoundMessage:
+      'Ce lien ne correspond à aucune invitation : elle a peut-être été annulée. Demande un nouveau lien à la personne qui t’a invité.',
+    usedTitle: 'Invitation déjà utilisée',
+    usedMessage: 'Ce lien a déjà servi. Demande un nouveau lien à la personne qui t’a invité.',
+    expiredTitle: 'Invitation expirée',
+    expiredMessage:
+      'Ce lien a expiré (il est valable 7 jours). Demande un nouveau lien à la personne qui t’a invité.',
+    alreadyOwnerTitle: 'Tu t’occupes déjà de {name}',
+    alreadyOwnerMessage: 'Tu fais déjà partie des humains de {name} : rien à accepter.',
+    seeDog: 'Voir {name}',
+    limitTitle: 'Maximum de chiens atteint',
   },
   dates: {
     today: 'Aujourd’hui',
@@ -666,6 +724,15 @@ export const fr = {
       'Ce chien est inscrit à une balade à venir qui n’accepte pas ce gabarit. Annule d’abord son inscription à cette balade, puis change sa taille.',
     'dog.limit_reached':
       'Tu as atteint le maximum de 20 chiens. Supprime un chien avant d’en ajouter un autre.',
+    'dog.last_owner':
+      'Tu es le dernier propriétaire de ce chien : tu ne peux pas le quitter, mais tu peux le supprimer.',
+    'dog.has_other_owners':
+      'Ce chien a d’autres propriétaires : tu ne peux plus le supprimer, mais tu peux ne plus t’en occuper.',
+    'dog.already_owner': 'Tu fais déjà partie des humains de ce chien.',
+    'invitation.not_found':
+      'Cette invitation n’existe pas ou a été annulée. Demande un nouveau lien.',
+    'invitation.already_used': 'Cette invitation a déjà été utilisée. Demande un nouveau lien.',
+    'invitation.expired': 'Cette invitation a expiré. Demande un nouveau lien.',
     'user.not_found': 'Cette personne n’existe pas ou plus.',
     'auth.invalid_token': 'La connexion a été refusée. Réessaie.',
     'auth.unauthenticated': 'Ta session a expiré. Reconnecte-toi.',

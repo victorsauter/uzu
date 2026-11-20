@@ -20,24 +20,24 @@ public static class DogEndpoints
 
         group.MapGet("/me/dogs", ListMyDogs)
             .WithName("listMyDogs")
-            .WithSummary("List the signed-in user's dogs.")
+            .WithSummary("List the dogs the signed-in user is an owner of, each with all its humans.")
             .ProducesValidationProblem();
 
         group.MapPost("/dogs", CreateDog)
             .WithName("createDog")
-            .WithSummary("Create a dog owned by the signed-in user (20 dogs at most per account).")
+            .WithSummary("Create a dog; the signed-in user becomes its owner (20 dogs at most per human, shared dogs included).")
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/dogs/{id:guid}", GetDog)
             .WithName("getDog")
-            .WithSummary("Get a dog.")
+            .WithSummary("Get a dog with its humans.")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapPatch("/dogs/{id:guid}", UpdateDog)
             .WithName("updateDog")
-            .WithSummary("Update one of the signed-in user's dogs. The size cannot change while the dog is registered to an upcoming walk that does not allow the new size.")
+            .WithSummary("Update a dog (any of its owners). The size cannot change while the dog is registered to an upcoming walk that does not allow the new size.")
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -45,9 +45,17 @@ public static class DogEndpoints
 
         group.MapDelete("/dogs/{id:guid}", DeleteDog)
             .WithName("deleteDog")
-            .WithSummary("Delete one of the signed-in user's dogs.")
+            .WithSummary("Delete a dog. Reserved to its last owner: 409 dog.has_other_owners while another owner remains.")
             .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapDelete("/dogs/{id:guid}/members/me", LeaveDog)
+            .WithName("leaveDog")
+            .WithSummary("Stop being one of the dog's humans. 409 dog.last_owner for its last owner, who can only delete it. Registrations already made are kept.")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         return routes;
     }
@@ -61,7 +69,7 @@ public static class DogEndpoints
         var userId = principal.GetUserId();
         var dogs = await db.Dogs.AsNoTracking()
             .WithMembers()
-            .Where(d => d.OwnerId == userId)
+            .OwnedBy(userId)
             .OrderForDisplay()
             .Take(limit)
             .ToListAsync(cancellationToken);
@@ -71,20 +79,19 @@ public static class DogEndpoints
     private static async Task<Results<Created<DogResponse>, ProblemHttpResult>> CreateDog(
         CreateDogRequest request, ClaimsPrincipal principal, DogoDbContext db, CancellationToken cancellationToken)
     {
-        // The owner's row is locked so that concurrent creations cannot pass the limit together.
+        // The account row is locked so that concurrent creations and invitation acceptances cannot
+        // pass the limit together (ADR 0037, 0042).
         var ownerId = principal.GetUserId();
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        await db.Database.SqlQuery<Guid>($"SELECT id AS \"Value\" FROM users WHERE id = {ownerId} FOR UPDATE").ToListAsync(cancellationToken);
-        if (await db.Dogs.CountAsync(d => d.OwnerId == ownerId, cancellationToken) >= Dog.MaxPerOwner)
+        await LockUserAsync(db, ownerId, cancellationToken);
+        if (await HasReachedLimitAsync(db, ownerId, cancellationToken))
         {
-            return Problems.Conflict(ErrorCodes.DogLimitReached, $"An account cannot have more than {Dog.MaxPerOwner} dogs.");
+            return LimitReached();
         }
 
         var owner = await db.Users.SingleAsync(u => u.Id == ownerId, cancellationToken);
         var dog = new Dog
         {
-            Owner = owner,
-            OwnerId = ownerId,
             Name = request.Name.Trim(),
             Size = request.Size,
             BirthDate = request.BirthDate,
@@ -94,6 +101,7 @@ public static class DogEndpoints
             LeashHabit = request.LeashHabit,
             Description = request.Description?.Trim() ?? "",
         };
+        dog.Members.Add(new DogMember { Dog = dog, DogId = dog.Id, User = owner, UserId = owner.Id, Role = DogMemberRole.Owner });
         db.Dogs.Add(dog);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -194,7 +202,8 @@ public static class DogEndpoints
         // The dog row is locked first (ADR 0037): a registration of this dog running at the same
         // time share-locks it, so it either commits before the update below, which then cancels
         // it, or waits and finds no dog. An acceptance racing the update only accepts a
-        // registration still pending, and the update below cancels an accepted one.
+        // registration still pending, and the update below cancels an accepted one. The lock also
+        // serialises the deletion with owners leaving or joining (ADR 0042).
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var (dog, problem) = await FindOwnedDogAsync(db, id, principal, cancellationToken, forUpdate: true);
         if (dog is null)
@@ -202,16 +211,13 @@ public static class DogEndpoints
             return problem!;
         }
 
-        // Spec §4.1: deleting a dog cancels its upcoming registrations, which frees their places.
-        // Registrations of past walks are kept as history; the foreign key sets their dog to null.
-        var now = timeProvider.GetUtcNow();
-        await db.Registrations
-            .Where(r => r.DogId == id
-                && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Accepted)
-                && r.Walk.StartsAt > now)
-            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RegistrationStatus.Cancelled), cancellationToken);
-        db.Dogs.Remove(dog);
-        await db.SaveChangesAsync(cancellationToken);
+        // Spec §4.1: only the last owner deletes the dog; the others can only leave it.
+        if (OwnerCount(dog) > 1)
+        {
+            return Problems.Conflict(ErrorCodes.DogHasOtherOwners, "Another owner remains: leave the dog instead of deleting it.");
+        }
+
+        await DeleteLockedDogsAsync(db, [id], timeProvider.GetUtcNow(), cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         if (dog.PhotoFileName is not null)
         {
@@ -221,33 +227,103 @@ public static class DogEndpoints
         return TypedResults.NoContent();
     }
 
+    private static async Task<Results<NoContent, ProblemHttpResult>> LeaveDog(
+        Guid id, ClaimsPrincipal principal, DogoDbContext db, CancellationToken cancellationToken)
+    {
+        // The dog row is locked (ADR 0042): two owners leaving at the same time run one after the
+        // other, and the second one sees that it is now the last owner.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var (dog, problem) = await FindOwnedDogAsync(db, id, principal, cancellationToken, forUpdate: true);
+        if (dog is null)
+        {
+            return problem!;
+        }
+
+        if (OwnerCount(dog) <= 1)
+        {
+            return Problems.Conflict(ErrorCodes.DogLastOwner, "The last owner cannot leave the dog; it can only be deleted.");
+        }
+
+        // Registrations already made by this human for the dog are kept (spec §4.1).
+        var userId = principal.GetUserId();
+        await db.DogMembers.Where(m => m.DogId == id && m.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return TypedResults.NoContent();
+    }
+
     /// <summary>
-    /// Loads a dog for modification by the signed-in user: 404 <c>dog.not_found</c> when it
-    /// does not exist, 403 <c>dog.forbidden</c> when someone else owns it (spec §4.1).
+    /// Deletes dogs whose rows the caller has locked, with what spec §4.1 says: their upcoming
+    /// registrations (whoever made them) are cancelled, which frees their places; registrations of
+    /// past walks are kept as history (the foreign key sets their dog to null); links and
+    /// invitations go by cascade. Photo files are the caller's business, after the commit.
+    /// </summary>
+    internal static async Task DeleteLockedDogsAsync(DogoDbContext db, IReadOnlyCollection<Guid> dogIds, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (dogIds.Count == 0)
+        {
+            return;
+        }
+
+        await db.Registrations
+            .Where(r => r.DogId != null && dogIds.Contains(r.DogId.Value)
+                && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Accepted)
+                && r.Walk.StartsAt > now)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RegistrationStatus.Cancelled), cancellationToken);
+        await db.Dogs.Where(d => dogIds.Contains(d.Id)).ExecuteDeleteAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Loads a dog, with its humans, for modification by the signed-in user: 404 <c>dog.not_found</c>
+    /// when it does not exist, 403 <c>dog.forbidden</c> when the user is not one of its owners (spec §4.1).
     /// </summary>
     /// <param name="forUpdate">Locks the dog row (<c>SELECT … FOR UPDATE</c>) until the current transaction ends.</param>
     internal static async Task<(Dog? Dog, ProblemHttpResult? Problem)> FindOwnedDogAsync(
         DogoDbContext db, Guid id, ClaimsPrincipal principal, CancellationToken cancellationToken, bool forUpdate = false)
     {
         var dog = forUpdate
-            ? (await db.Dogs.FromSql($"SELECT * FROM dogs WHERE id = {id} FOR UPDATE").ToListAsync(cancellationToken)).SingleOrDefault()
+            ? await LockDogAsync(db, id, cancellationToken)
             : await db.Dogs.SingleOrDefaultAsync(d => d.Id == id, cancellationToken);
         if (dog is null)
         {
             return (null, DogNotFound());
         }
 
-        if (dog.OwnerId != principal.GetUserId())
+        // Read after the lock: these are the humans committed when the lock was obtained.
+        await db.Entry(dog).Collection(d => d.Members).Query().Include(m => m.User).LoadAsync(cancellationToken);
+        var userId = principal.GetUserId();
+        if (!dog.Members.Any(m => m.UserId == userId && m.Role == DogMemberRole.Owner))
         {
-            return (null, Problems.Forbidden(ErrorCodes.DogForbidden, "Only the owner can modify this dog."));
+            return (null, Forbidden());
         }
 
-        // The caller is the owner, and the dog's response needs the owner: loaded once.
-        await db.Entry(dog).Reference(d => d.Owner).LoadAsync(cancellationToken);
         return (dog, null);
     }
 
-    private static ProblemHttpResult DogNotFound() => Problems.NotFound(ErrorCodes.DogNotFound, "The dog does not exist.");
+    /// <summary>Loads a dog and locks its row (<c>SELECT … FOR UPDATE</c>) until the current transaction ends.</summary>
+    internal static async Task<Dog?> LockDogAsync(DogoDbContext db, Guid id, CancellationToken cancellationToken) =>
+        (await db.Dogs.FromSql($"SELECT * FROM dogs WHERE id = {id} FOR UPDATE").ToListAsync(cancellationToken)).SingleOrDefault();
+
+    /// <summary>
+    /// Locks the account row until the current transaction ends: creating a dog and accepting an
+    /// invitation take it so that the limit of dogs per human holds (ADR 0037, 0042). Taken before
+    /// any dog lock (lock order: account, dogs, walks).
+    /// </summary>
+    internal static Task LockUserAsync(DogoDbContext db, Guid userId, CancellationToken cancellationToken) =>
+        db.Database.SqlQuery<Guid>($"SELECT id AS \"Value\" FROM users WHERE id = {userId} FOR UPDATE").ToListAsync(cancellationToken);
+
+    /// <summary>Whether the user already has <see cref="Dog.MaxPerOwner"/> dogs, counted on their links (shared dogs included).</summary>
+    internal static async Task<bool> HasReachedLimitAsync(DogoDbContext db, Guid userId, CancellationToken cancellationToken) =>
+        await db.DogMembers.CountAsync(m => m.UserId == userId, cancellationToken) >= Dog.MaxPerOwner;
+
+    internal static ProblemHttpResult LimitReached() =>
+        Problems.Conflict(ErrorCodes.DogLimitReached, $"A human cannot have more than {Dog.MaxPerOwner} dogs.");
+
+    internal static ProblemHttpResult Forbidden() =>
+        Problems.Forbidden(ErrorCodes.DogForbidden, "Only an owner of this dog can do this.");
+
+    internal static ProblemHttpResult DogNotFound() => Problems.NotFound(ErrorCodes.DogNotFound, "The dog does not exist.");
+
+    private static int OwnerCount(Dog dog) => dog.Members.Count(m => m.Role == DogMemberRole.Owner);
 
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

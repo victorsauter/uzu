@@ -88,13 +88,22 @@ internal static class RegistrationRules
 
     /// <summary>
     /// Loads dogs and share-locks their rows (<c>FOR SHARE</c>) until the transaction ends: their
-    /// size cannot change, nor can they be deleted, until the registration is written (ADR 0037).
-    /// Always called <b>before</b> <see cref="WalkQueries.LockWalkAsync"/>: deleting a dog locks the
-    /// dog and then touches the walk rows (foreign key checks), so the opposite order could deadlock.
+    /// size cannot change, nor can they be deleted or lose an owner, until the registration is
+    /// written (ADR 0037, 0042). With <paramref name="ownerId"/>, only the dogs that user is an owner
+    /// of (any of their owners registers them). Always called <b>before</b>
+    /// <see cref="WalkQueries.LockWalkAsync"/>: deleting a dog locks the dog and then touches the
+    /// walk rows (foreign key checks), so the opposite order could deadlock.
     /// </summary>
     public static Task<List<Dogs.Dog>> LockDogsAsync(DogoDbContext db, Guid[] dogIds, Guid? ownerId, CancellationToken cancellationToken) =>
         ownerId is { } owner
-            ? db.Dogs.FromSql($"SELECT * FROM dogs WHERE id = ANY({dogIds}) AND owner_id = {owner} FOR SHARE").AsNoTracking().ToListAsync(cancellationToken)
+            ? db.Dogs.FromSql(
+                    $"""
+                    SELECT d.* FROM dogs d
+                    WHERE d.id = ANY({dogIds})
+                      AND EXISTS (SELECT 1 FROM dog_members m WHERE m.dog_id = d.id AND m.user_id = {owner} AND m.role = 'Owner')
+                    FOR SHARE OF d
+                    """)
+                .AsNoTracking().ToListAsync(cancellationToken)
             : db.Dogs.FromSql($"SELECT * FROM dogs WHERE id = ANY({dogIds}) FOR SHARE").AsNoTracking().ToListAsync(cancellationToken);
 
     /// <summary>

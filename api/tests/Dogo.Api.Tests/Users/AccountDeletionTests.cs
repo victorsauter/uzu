@@ -113,7 +113,7 @@ public sealed class AccountDeletionTests(ApiFixture fixture) : OrganizationTestB
             Assert.Equal(0, await db.CountAcceptedAsync(bobWalk.Id, Ct));
 
             // Dogs, devices, preferences and sessions are deleted.
-            Assert.Equal(0, await db.Dogs.CountAsync(d => d.OwnerId == aliceId, Ct));
+            Assert.Equal(0, await db.DogMembers.CountAsync(m => m.UserId == aliceId, Ct));
             Assert.Equal(0, await db.Devices.CountAsync(d => d.UserId == aliceId, Ct));
             Assert.Equal(0, await db.NotificationPreferences.CountAsync(p => p.UserId == aliceId, Ct));
             Assert.Equal(0, await db.RefreshTokens.CountAsync(t => t.UserId == aliceId, Ct));

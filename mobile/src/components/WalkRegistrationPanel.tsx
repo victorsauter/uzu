@@ -3,8 +3,9 @@ import { Alert, Pressable, View } from 'react-native';
 
 import { useMyDogs } from '@/api/dogs';
 import { ApiError, errorMessage } from '@/api/errors';
-import type { Dog, WalkDetail } from '@/api/types';
+import type { Dog, UserSummary, WalkDetail } from '@/api/types';
 import { useCancelRegistration, useRegisterDogs } from '@/api/walks';
+import { useSession } from '@/auth';
 import { offerNotifications } from '@/notifications';
 import { enumLabel, format, plural, t } from '@/strings';
 import { useTheme } from '@/theme';
@@ -30,8 +31,25 @@ export interface WalkRegistrationPanelProps {
 
 const isActive = (status: string) => status === 'Pending' || status === 'Accepted';
 
+/**
+ * The registration of one of my dogs made by another of its owners
+ * (`myDogsRegistrations`, ADR 0042), or `undefined`. Mine are in `myRegistrations`.
+ */
+function registrationByOtherOwner(dogId: string, walk: WalkDetail, meId: string | undefined) {
+  return walk.myDogsRegistrations.find(
+    (r) => r.dogId === dogId && isActive(r.status) && r.registeredBy.id !== meId,
+  );
+}
+
 /** Why a dog cannot be picked, or `null` when it can. */
-export function dogUnavailableReason(dog: Dog, walk: WalkDetail): string | null {
+export function dogUnavailableReason(dog: Dog, walk: WalkDetail, meId?: string): string | null {
+  const byOther = registrationByOtherOwner(dog.id, walk, meId);
+  if (byOther) {
+    return format(
+      byOther.status === 'Accepted' ? t.walk.alreadyRegisteredBy : t.walk.alreadyPendingBy,
+      { name: byOther.registeredBy.displayName },
+    );
+  }
   const registration = walk.myRegistrations.find((r) => r.dogId === dog.id && isActive(r.status));
   if (registration?.status === 'Accepted') return t.walk.alreadyRegistered;
   if (registration?.status === 'Pending') return t.walk.alreadyPending;
@@ -101,6 +119,7 @@ export function WalkRegistrationPanel({
   onOpenOrganization,
 }: WalkRegistrationPanelProps) {
   const { spacing } = useTheme();
+  const { user } = useSession();
   const dogs = useMyDogs();
   const register = useRegisterDogs(walk.id);
   const cancel = useCancelRegistration(walk.id);
@@ -142,12 +161,14 @@ export function WalkRegistrationPanel({
     });
   }
 
-  function confirmCancel(registrationId: string, name: string) {
+  function confirmCancel(registrationId: string, name: string, madeBy: UserSummary | null) {
     setMessage(null);
     setError(null);
     Alert.alert(
       format(t.walk.cancelRegistrationTitle, { name }),
-      t.walk.cancelRegistrationMessage,
+      madeBy
+        ? format(t.walk.cancelRegistrationOfOtherMessage, { name: madeBy.displayName })
+        : t.walk.cancelRegistrationMessage,
       [
         { text: t.walk.keep, style: 'cancel' },
         {
@@ -160,7 +181,15 @@ export function WalkRegistrationPanel({
     );
   }
 
-  const mine = walk.myRegistrations;
+  // My registrations, then those another owner of one of my dogs made (shown « par {prénom} »).
+  const mine = [
+    ...walk.myRegistrations.map((r) => ({ ...r, madeBy: null as UserSummary | null })),
+    ...walk.myDogsRegistrations
+      .filter(
+        (r) => r.registeredBy.id !== user?.id && !walk.myRegistrations.some((m) => m.id === r.id),
+      )
+      .map((r) => ({ id: r.id, dogId: r.dogId, status: r.status, madeBy: r.registeredBy })),
+  ];
   const errorText = error ? (
     <Text color="danger" accessibilityLiveRegion="polite">
       {error}
@@ -176,9 +205,14 @@ export function WalkRegistrationPanel({
             return (
               <View key={registration.id} style={{ gap: spacing.xs }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Text variant="subheading" style={{ flex: 1 }}>
-                    {name}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="subheading">{name}</Text>
+                    {registration.madeBy ? (
+                      <Text variant="caption" color="textMuted">
+                        {format(t.walk.registeredBy, { name: registration.madeBy.displayName })}
+                      </Text>
+                    ) : null}
+                  </View>
                   <Badge
                     tone={
                       registration.status === 'Accepted'
@@ -196,7 +230,7 @@ export function WalkRegistrationPanel({
                     accessibilityLabel={`${t.walk.cancelRegistration} : ${name}`}
                     variant="secondary"
                     loading={cancel.isPending && cancel.variables === registration.id}
-                    onPress={() => confirmCancel(registration.id, name)}
+                    onPress={() => confirmCancel(registration.id, name, registration.madeBy)}
                   />
                 ) : null}
               </View>
@@ -228,7 +262,7 @@ export function WalkRegistrationPanel({
                   key={dog.id}
                   dog={dog}
                   selected={selected.includes(dog.id)}
-                  reason={dogUnavailableReason(dog, walk)}
+                  reason={dogUnavailableReason(dog, walk, user?.id)}
                   onToggle={() => toggle(dog.id)}
                 />
               ))}

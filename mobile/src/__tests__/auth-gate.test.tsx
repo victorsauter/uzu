@@ -51,4 +51,15 @@ describe('auth gate', () => {
     expect(await screen.findByText(t.app.tagline)).toBeTruthy();
     expect(screen).toHavePathname('/sign-in');
   });
+
+  // The link is not kept for after the sign-in (no mechanism for it yet): the person taps it again.
+  it('keeps signed-out users away from an invitation link, which does not reach the API', async () => {
+    await renderRouter(APP_DIR, { initialUrl: '/invitation/some-token' });
+    expect(await screen.findByText(t.app.tagline)).toBeTruthy();
+    expect(screen).toHavePathname('/sign-in');
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('dog-invitations'),
+      expect.anything(),
+    );
+  });
 });

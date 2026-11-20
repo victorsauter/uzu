@@ -179,14 +179,15 @@ describe('dog detail', () => {
   });
 
   describe('mine is computed from the members', () => {
-    it('offers edit and delete when I am among the owners, whoever else is', async () => {
+    it('offers edit, and « Ne plus m’occuper de » instead of delete, when I am one of several owners', async () => {
       mockApi({
         [`GET ${dogPath}`]: () => ok({ ...testDog, members: [member(camille), member(testUser)] }),
       });
       await signIn();
       await renderRouter(APP_DIR, { initialUrl: `/dogs/${testDog.id}` });
       expect(await screen.findByRole('button', { name: t.common.edit })).toBeTruthy();
-      expect(screen.getByRole('button', { name: t.common.delete })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Ne plus m’occuper de Biscotte' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: t.common.delete })).toBeNull();
       expect(screen.queryByRole('button', { name: t.report.action })).toBeNull();
     });
 

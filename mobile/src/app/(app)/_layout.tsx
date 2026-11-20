@@ -52,6 +52,11 @@ export default function AppLayout() {
       <Stack.Screen name="organizations/index" options={{ title: t.organization.findTitle }} />
       <Stack.Screen name="dogs/[id]/edit" options={{ title: t.dog.editTitle }} />
       <Stack.Screen name="dogs/[id]/index" options={{ title: t.dog.detailTitle }} />
+      <Stack.Screen
+        name="dogs/[id]/invite"
+        options={{ title: t.dogInvitation.screenTitle, presentation: 'modal' }}
+      />
+      <Stack.Screen name="invitation/[token]" options={{ title: t.dogInvitation.screenTitle }} />
       <Stack.Screen name="organizations/[id]/edit" options={{ title: t.organization.editTitle }} />
       <Stack.Screen
         name="organizations/[id]/index"

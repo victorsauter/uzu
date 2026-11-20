@@ -30,8 +30,8 @@ public sealed class RateLimitingOptions
     public RateLimit Writes { get; set; } = new() { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) };
 
     /// <summary>
-    /// Writes that notify other people or fill the disk (<see cref="RateLimiting.SensitiveEndpoints"/>),
-    /// per user, on top of <see cref="Writes"/>.
+    /// Writes that notify other people or fill the disk, and routes that take a dog invitation token
+    /// (<see cref="RateLimiting.SensitiveEndpoints"/>), per user, on top of <see cref="Writes"/>.
     /// </summary>
     public RateLimit SensitiveWrites { get; set; } = new() { PermitLimit = 30, Window = TimeSpan.FromMinutes(10) };
 }
@@ -39,9 +39,11 @@ public sealed class RateLimitingOptions
 public static class RateLimiting
 {
     /// <summary>
-    /// Endpoint names (operation ids) of the sensitive writes: registrations, messages, membership
-    /// requests and reports notify other people; photos fill the disk; devices are stored per user.
-    /// Matched by name so that feature files stay free of rate limiting concerns.
+    /// Endpoint names (operation ids) of the sensitive requests: registrations, messages, membership
+    /// requests and reports notify other people; photos fill the disk; devices are stored per user;
+    /// dog invitations hand out a token, and the routes taking a token (reading included) are
+    /// limited so that tokens cannot be tried in bulk (ADR 0042). Matched by name so that feature
+    /// files stay free of rate limiting concerns.
     /// </summary>
     public static readonly IReadOnlySet<string> SensitiveEndpoints = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -52,6 +54,9 @@ public static class RateLimiting
         "uploadMyPhoto",
         "uploadDogPhoto",
         "registerDevice",
+        "createDogInvitation",
+        "getDogInvitation",
+        "acceptDogInvitation",
     };
 
     private const string AuthPathPrefix = "/api/v1/auth";
@@ -101,9 +106,9 @@ public static class RateLimiting
         HttpMethods.IsPost(request.Method) || HttpMethods.IsPut(request.Method)
         || HttpMethods.IsPatch(request.Method) || HttpMethods.IsDelete(request.Method);
 
+    /// <summary>Listed in <see cref="SensitiveEndpoints"/>, whatever the method (a token lookup is a read).</summary>
     private static bool IsSensitive(HttpContext context) =>
-        IsWrite(context.Request)
-        && context.GetEndpoint()?.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName is { } name
+        context.GetEndpoint()?.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName is { } name
         && SensitiveEndpoints.Contains(name);
 
     /// <summary>The signed-in user (authentication runs first), or the client address.</summary>

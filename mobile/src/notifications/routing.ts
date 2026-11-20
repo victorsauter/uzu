@@ -8,6 +8,8 @@ export const notificationTypes = [
   'registration_requested',
   'registration_accepted',
   'registration_declined',
+  // Another owner of my dog cancelled its registration (ADR 0042): opens the walk.
+  'registration_cancelled_by_owner',
   'walk_updated',
   'walk_cancelled',
   'message_posted',

@@ -23,6 +23,10 @@ public sealed class DogoDbContext(DbContextOptions<DogoDbContext> options, TimeP
 
     public DbSet<Dog> Dogs => Set<Dog>();
 
+    public DbSet<DogMember> DogMembers => Set<DogMember>();
+
+    public DbSet<DogInvitation> DogInvitations => Set<DogInvitation>();
+
     public DbSet<Walk> Walks => Set<Walk>();
 
     public DbSet<Registration> Registrations => Set<Registration>();

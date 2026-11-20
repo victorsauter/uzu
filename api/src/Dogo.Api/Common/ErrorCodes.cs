@@ -34,6 +34,14 @@ public static class ErrorCodes
     public const string DogSizeInUse = "dog.size_in_use";
     public const string DogLimitReached = "dog.limit_reached";
 
+    // Dogs shared by several humans and invitations (spec §4.1, ADR 0042).
+    public const string DogHasOtherOwners = "dog.has_other_owners";
+    public const string DogLastOwner = "dog.last_owner";
+    public const string DogAlreadyOwner = "dog.already_owner";
+    public const string InvitationNotFound = "invitation.not_found";
+    public const string InvitationAlreadyUsed = "invitation.already_used";
+    public const string InvitationExpired = "invitation.expired";
+
     // Walks (spec §4.2) and registrations (spec §4.3).
     public const string WalkNotFound = "walk.not_found";
     public const string WalkForbidden = "walk.forbidden";

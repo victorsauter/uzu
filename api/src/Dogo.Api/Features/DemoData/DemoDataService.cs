@@ -47,6 +47,7 @@ public sealed partial class DemoDataService(
 
             db.AddRange(set.Users);
             db.AddRange(set.Dogs);
+            db.AddRange(set.DogMembers);
             db.AddRange(set.Organizations);
             db.AddRange(set.Memberships);
             db.AddRange(set.Series);
@@ -108,7 +109,7 @@ public sealed partial class DemoDataService(
                 u.ProviderSubject,
                 u.DisplayName,
                 u.PhotoFileName,
-                Dogs = db.Dogs.Where(d => d.OwnerId == u.Id).OrderBy(d => d.CreatedAt).ThenBy(d => d.Name).Select(d => d.Name).ToList(),
+                Dogs = u.DogLinks.OrderBy(m => m.Dog.CreatedAt).ThenBy(m => m.Dog.Name).Select(m => m.Dog.Name).ToList(),
                 Organization = db.Memberships
                     .Where(m => m.UserId == u.Id && m.Status == MembershipStatus.Accepted
                         && (m.Role == MembershipRole.Owner || m.Role == MembershipRole.Educator))
@@ -139,7 +140,7 @@ public sealed partial class DemoDataService(
                 && (m.Role == MembershipRole.Owner || m.Role == MembershipRole.Educator)),
             cancellationToken);
         var walks = db.Walks.Where(w => w.OrganizerId != null && demoIds.Contains(w.OrganizerId.Value));
-        var dogs = db.Dogs.Where(d => demoIds.Contains(d.OwnerId));
+        var dogs = db.Dogs.Where(d => d.Members.Any(m => demoIds.Contains(m.UserId)));
         return new DemoDataCounts(
             Owners: await demoUsers.CountAsync(cancellationToken) - educators,
             Educators: educators,
@@ -172,8 +173,10 @@ public sealed partial class DemoDataService(
             return [];
         }
 
+        // Dogs whose humans are all demo accounts; a dog someone else also owns stays with them.
+        var demoDogs = db.Dogs.Where(d => d.Members.Any(m => demoIds.Contains(m.UserId)) && !d.Members.Any(m => !demoIds.Contains(m.UserId)));
         var files = await db.Users.Where(u => demoIds.Contains(u.Id) && u.PhotoFileName != null).Select(u => u.PhotoFileName!)
-            .Concat(db.Dogs.Where(d => demoIds.Contains(d.OwnerId) && d.PhotoFileName != null).Select(d => d.PhotoFileName!))
+            .Concat(demoDogs.Where(d => d.PhotoFileName != null).Select(d => d.PhotoFileName!))
             .ToListAsync(cancellationToken);
 
         // Walks: kept when someone else registered or wrote; deleted otherwise (with their registrations and thread).
@@ -210,7 +213,9 @@ public sealed partial class DemoDataService(
             .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OrganizationStatus.Closed), cancellationToken);
         await demoOrganizations.Where(o => !keptOrganizationIds.Contains(o.Id)).ExecuteDeleteAsync(cancellationToken);
 
-        // The accounts; their dogs, series, blocks (both ways), devices, preferences and sessions follow by cascade.
+        // Their dogs (with their links and invitations), then the accounts; their remaining links,
+        // series, blocks (both ways), devices, preferences and sessions follow by cascade.
+        await demoDogs.ExecuteDeleteAsync(cancellationToken);
         await db.Users.Where(u => demoIds.Contains(u.Id)).ExecuteDeleteAsync(cancellationToken);
         return files;
     }

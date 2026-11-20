@@ -125,7 +125,7 @@ public abstract class ApiTestBase(ApiFixture fixture) : IAsyncLifetime
         Assert.Equal(expected with { Members = [] }, actual with { Members = [] });
     }
 
-    /// <summary>The dog has exactly one human, its owner, with the <c>Owner</c> role (ADR 0042, step 1a).</summary>
+    /// <summary>The dog has exactly one human, its owner, with the <c>Owner</c> role (ADR 0042).</summary>
     protected static void AssertOwnedBy(DogResponse dog, Guid userId, string displayName, string? photoUrl = null)
     {
         var member = Assert.Single(dog.Members);

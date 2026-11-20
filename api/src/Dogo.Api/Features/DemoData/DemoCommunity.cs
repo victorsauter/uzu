@@ -34,8 +34,23 @@ internal sealed record DemoReport(
     string? Walk = null,
     string? AdminNote = null);
 
+/// <summary>
+/// A dog of <see cref="Owner"/> (person key, dog name) that <see cref="CoOwner"/> also owns (ADR 0042),
+/// linked <see cref="DaysAgo"/> days ago, as if an invitation had been accepted.
+/// </summary>
+internal sealed record DemoSharedDog(string Owner, string Name, string CoOwner, int DaysAgo);
+
 internal static class DemoCommunity
 {
+    /// <summary>
+    /// Romain Gasser and Laura Petit share Oscar: Laura brings him to « Cani-balade au lever du
+    /// soleil » (DemoWalks), so that Romain sees « Déjà inscrit par Laura » on that walk.
+    /// </summary>
+    public static readonly IReadOnlyList<DemoSharedDog> SharedDogs =
+    [
+        new("romain-gasser", "Oscar", "laura-petit", 90),
+    ];
+
     public static readonly IReadOnlyList<DemoOrganization> Organizations =
     [
         new("club-sundgau", "Club canin du Sundgau",

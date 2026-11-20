@@ -63,6 +63,21 @@ export function formatShortDay(date: Date | string): string {
   return shortDayFormat.format(new Date(date));
 }
 
+const dateFormat = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long' });
+const dateWithYearFormat = new Intl.DateTimeFormat(LOCALE, {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
+/** « 27 novembre », with the year when it is not the current one (« 4 janvier 2027 »). */
+export function formatDate(date: Date | string, now: Date = new Date()): string {
+  const value = new Date(date);
+  return (value.getFullYear() === now.getFullYear() ? dateFormat : dateWithYearFormat).format(
+    value,
+  );
+}
+
 /** « 45 min », « 1 h », « 1 h 30 » */
 export function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);

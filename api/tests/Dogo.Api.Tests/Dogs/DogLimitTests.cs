@@ -14,15 +14,16 @@ public sealed class DogLimitTests(ApiFixture fixture) : ApiTestBase(fixture)
         {
             for (var i = 0; i < count; i++)
             {
-                db.Dogs.Add(new Dog
+                var dog = new Dog
                 {
-                    OwnerId = ownerId,
                     Name = $"Dog {i}",
                     Size = DogSize.Medium,
                     Sociability = Sociability.Easygoing,
                     Reactivity = Reactivity.None,
                     LeashHabit = LeashHabit.OnLeash,
-                });
+                };
+                db.Dogs.Add(dog);
+                db.DogMembers.Add(new DogMember { DogId = dog.Id, UserId = ownerId, Role = DogMemberRole.Owner });
             }
 
             await db.SaveChangesAsync(Ct);
@@ -49,7 +50,7 @@ public sealed class DogLimitTests(ApiFixture fixture) : ApiTestBase(fixture)
         var (other, _) = await SignedInAsync("bob", "Bob");
 
         await CreateDogAsync(other);
-        var someDog = await WithDbAsync(db => db.Dogs.Where(d => d.OwnerId == session.User.Id).Select(d => d.Id).FirstAsync(Ct));
+        var someDog = await WithDbAsync(db => db.DogMembers.Where(m => m.UserId == session.User.Id).Select(m => m.Dog).Select(d => d.Id).FirstAsync(Ct));
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/v1/dogs/{someDog}", Ct)).StatusCode);
         await CreateDogAsync(client);
     }

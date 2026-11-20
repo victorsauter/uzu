@@ -15,6 +15,8 @@ export const queryKeys = {
   myDogs: ['me', 'dogs'] as const,
   user: (id: string) => ['users', id] as const,
   dog: (id: string) => ['dogs', id] as const,
+  dogInvitations: (id: string) => ['dogs', id, 'invitations'] as const,
+  dogInvitation: (token: string) => ['dog-invitations', token] as const,
 };
 
 const fetchMe = () => unwrap(api.GET('/api/v1/me'));

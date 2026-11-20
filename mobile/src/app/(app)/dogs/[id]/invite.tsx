@@ -66,7 +66,8 @@ function RoleCard({
 }
 
 /**
- * « Ajouter un humain à {nom} »: choose the role (only « Propriétaire » for now),
+ * « Ajouter un humain à {nom} » (the title is the navigation bar's, as on
+ * `edit-profile`, not repeated in the content): choose the role (only « Propriétaire » for now),
  * then create the invitation and hand its link to the system share sheet. The
  * link is created once: sharing again after the share sheet was dismissed reuses
  * it instead of piling up invitations.
@@ -145,7 +146,6 @@ export default function InviteHumanScreen() {
   return (
     <Screen edges={['left', 'right', 'bottom']}>
       <Stack.Screen options={{ title: format(t.dogInvitation.sheetTitle, { name }) }} />
-      <Text variant="title">{format(t.dogInvitation.sheetTitle, { name })}</Text>
       <Text variant="heading">{t.dogInvitation.roleTitle}</Text>
       <View accessibilityRole="radiogroup" style={{ gap: spacing.sm }}>
         {options.map((option) => (

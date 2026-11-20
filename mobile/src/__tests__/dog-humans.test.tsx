@@ -60,7 +60,10 @@ describe('« Ajouter un humain »', () => {
       await screen.findByRole('button', { name: 'Ajouter un humain à Biscotte' }),
     );
     expect(screen).toHavePathname(`/dogs/${testDog.id}/invite`);
-    expect(await screen.findByText('Ajouter un humain à Biscotte')).toBeTruthy();
+    expect(await screen.findByText(t.dogInvitation.roleTitle)).toBeTruthy();
+    // The title is the navigation bar's alone: it is not repeated as a heading in the content.
+    expect(screen.queryByText('Ajouter un humain à Biscotte')).toBeNull();
+    expect(JSON.stringify(screen.toJSON())).toContain('"title":"Ajouter un humain à Biscotte"');
   });
 
   it('is absent when I am not one of the owners (and the invitations are not even asked)', async () => {
@@ -155,7 +158,7 @@ describe('the invitation sheet', () => {
     await fireEvent.press(
       await screen.findByRole('button', { name: 'Ajouter un humain à Biscotte' }),
     );
-    await screen.findByText('Ajouter un humain à Biscotte');
+    await screen.findByText(t.dogInvitation.roleTitle);
     return result;
   }
   const jsonCreated = (body: object) =>

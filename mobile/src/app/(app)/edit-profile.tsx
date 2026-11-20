@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useMyDogs } from '@/api/dogs';
 import { errorMessage } from '@/api/errors';
@@ -16,6 +16,8 @@ import {
   type ProfileFormValues,
 } from '@/lib/forms';
 import { useFocusedRouter } from '@/lib/hooks';
+import { takePendingInvitation } from '@/lib/pendingInvitation';
+import { endWelcome } from '@/lib/welcomeNudge';
 import { t } from '@/strings';
 
 /** Edit my profile; `?welcome=1` adds the first-run sentence (new member). */
@@ -48,6 +50,21 @@ function EditProfileForm({ welcome }: { welcome: boolean }) {
   const [photoError, setPhotoError] = useState<string | undefined>();
   const saving = update.isPending || uploadPhoto.isPending;
 
+  // However the welcome is left, whatever was waiting for it (an invitation link) may go on.
+  useEffect(() => (welcome ? endWelcome : undefined), [welcome]);
+
+  /**
+   * An invitation link that came before the account existed goes first: accepting
+   * it gives this new member a dog, so « Ajoute ton premier chien » would be
+   * asked in vain. Returns false when no link is waiting.
+   */
+  function goToPendingInvitation(): boolean {
+    const token = takePendingInvitation();
+    if (!token) return false;
+    router.replace({ pathname: '/invitation/[token]', params: { token } });
+    return true;
+  }
+
   async function save() {
     const found = validateProfile(values);
     setErrors(found);
@@ -78,6 +95,7 @@ function EditProfileForm({ welcome }: { welcome: boolean }) {
     }
     // A new member cannot register to a walk without a dog: carry on to adding one.
     if (welcome) {
+      if (goToPendingInvitation()) return;
       const mine = dogs.data ?? (await dogs.refetch()).data;
       if (mine?.length === 0) {
         router.replace({ pathname: '/dogs/new', params: { welcome: '1' } });
@@ -134,7 +152,13 @@ function EditProfileForm({ welcome }: { welcome: boolean }) {
       ) : null}
       <Button label={t.common.save} loading={saving} onPress={save} />
       {welcome ? (
-        <Button label={t.profile.later} variant="secondary" onPress={() => router.back()} />
+        <Button
+          label={t.profile.later}
+          variant="secondary"
+          onPress={() => {
+            if (!goToPendingInvitation()) router.back();
+          }}
+        />
       ) : null}
     </>
   );

@@ -12,6 +12,7 @@ import { t } from '@/strings';
 import { ThemeProvider } from '@/theme';
 
 import { config, type ConfigError } from './config';
+import { clearPendingInvitation } from './pendingInvitation';
 
 /**
  * Every app-wide provider, in dependency order. Used by the root layout.
@@ -29,8 +30,11 @@ export function AppProviders({
 
   useEffect(() => connectQueryEventsToReactNative(), []);
 
-  // Cached data belongs to the previous user.
-  const clearCache = useCallback(() => queryClient.clear(), [queryClient]);
+  // Cached data belongs to the previous user; so does an invitation link kept for after a sign-in.
+  const clearCache = useCallback(() => {
+    queryClient.clear();
+    clearPendingInvitation();
+  }, [queryClient]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

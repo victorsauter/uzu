@@ -1,6 +1,7 @@
 import { timeoutManager } from '@tanstack/react-query';
 
 import { resetNavigationGuard } from '@/lib/navigation';
+import { clearPendingInvitation } from '@/lib/pendingInvitation';
 import { NORMAL_FONT_SCALE, setFontScale } from '@/test/fontScale';
 
 // TanStack Query keeps a 5-minute timer per unobserved query (`gcTime`). Left
@@ -37,6 +38,7 @@ jest.mock('expo-secure-store', () => {
 // A destination opened in one test must not count as « just opened » in the next.
 beforeEach(() => {
   resetNavigationGuard();
+  clearPendingInvitation();
   // The test runtime reports a text size factor of 2: tests start at the normal size.
   setFontScale(NORMAL_FONT_SCALE);
 });

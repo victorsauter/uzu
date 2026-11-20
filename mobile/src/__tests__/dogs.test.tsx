@@ -150,7 +150,7 @@ describe('dog detail', () => {
       expect(screen.getByText('avec Ana, Ben et 3 autres')).toBeTruthy();
       expect(screen.getByText('+2')).toBeTruthy();
       const stack = within(screen.getByTestId('dog-humans-stack'));
-      expect(stack.getAllByLabelText(/^Photo de /, { hidden: true })).toHaveLength(3);
+      expect(stack.getAllByLabelText(/^Photo d(e |’)/, { hidden: true })).toHaveLength(3);
     });
 
     it('lists one row per human with the role, and opens a profile except mine', async () => {

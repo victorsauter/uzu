@@ -10,11 +10,21 @@ export type { ApiErrorCode, Strings } from './fr';
  */
 export const t = fr;
 
-/** Fills `{name}` placeholders: `format(t.profile.greeting, { name: 'Léa' })`. */
+/** A vowel or a mute-looking start: « de » becomes « d’ » before it (Oscar, Élodie, Antoine). */
+const ELIDING_START = /^[aeiouàâäéèêëîïôöùûüœæ]/i;
+
+/**
+ * Fills `{name}` placeholders: `format(t.profile.greeting, { name: 'Léa' })`.
+ * French elision: « de {name} » becomes « d’Oscar » when the value starts with a vowel
+ * (`h` and `y` are left alone: « de Hugo », « de Yannick »).
+ */
 export function format(template: string, params: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    key in params ? String(params[key]) : match,
-  );
+  return template.replace(/(\b[Dd]e )?\{(\w+)\}/g, (match, de: string | undefined, key: string) => {
+    if (!(key in params)) return match;
+    const value = String(params[key]);
+    if (!de) return value;
+    return ELIDING_START.test(value) ? `${de[0]}’${value}` : `${de}${value}`;
+  });
 }
 
 /**

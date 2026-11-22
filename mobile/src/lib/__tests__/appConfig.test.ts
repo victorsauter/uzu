@@ -220,7 +220,7 @@ describe('brand colours', () => {
     expect(BRAND.iconBackground).toBe(lightColors.infoSoft);
   });
 
-  it('colour the splash screen in light and dark, and the adaptive icon in sand (ADR 0043)', () => {
+  it('colour the splash screen in light and dark, and the adaptive icon in sand (ADR 0044)', () => {
     const config = createConfig(context, {});
     const splash = config.plugins?.find((p) => Array.isArray(p) && p[0] === 'expo-splash-screen');
     expect(splash).toEqual([
@@ -238,7 +238,7 @@ describe('brand colours', () => {
   });
 });
 
-describe('brand assets (ADR 0043)', () => {
+describe('brand assets (ADR 0044)', () => {
   /** The project has no Node types (they would change the app's globals): the file system is typed here. */
   const fs = jest.requireActual<{
     existsSync(path: string): boolean;

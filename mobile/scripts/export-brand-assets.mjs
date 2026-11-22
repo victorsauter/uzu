@@ -1,5 +1,5 @@
 // Exports the app icon, the Android adaptive icon layers, the splash image and the
-// favicon from the logo drawing (assets/brand/uzu-head.svg, ADR 0043).
+// favicon from the logo drawing (assets/brand/uzu-head.svg, ADR 0044).
 //
 //   npm run brand:export                            writes the PNGs into assets/
 //   node scripts/export-brand-assets.mjs <out-dir>  writes them elsewhere (to compare)

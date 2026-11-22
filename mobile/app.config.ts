@@ -30,13 +30,13 @@ export const BRAND = {
   backgroundLight: '#FBF6EC',
   backgroundDark: '#14100D',
   primary: '#9C5626',
-  /** Sand behind the logo (ADR 0043): background of the icons, the only colour of the palette on which the white, fawn and black of the head all stand out. */
+  /** Sand behind the logo (ADR 0044): background of the icons, the only colour of the palette on which the white, fawn and black of the head all stand out. */
   iconBackground: '#E9C9A0',
 } as const;
 
 /**
  * Icon and splash images, exported from the logo drawing `assets/brand/uzu-head.svg`
- * by `npm run brand:export` (ADR 0043). A test checks their size and transparency.
+ * by `npm run brand:export` (ADR 0044). A test checks their size and transparency.
  */
 export const BRAND_ASSETS = {
   icon: './assets/icon.png',
@@ -225,7 +225,7 @@ export function createConfig({ config }: ConfigContext, env: ConfigEnv = process
       [
         'expo-splash-screen',
         {
-          // A sand disc with the head, on the light or dark background (ADR 0043).
+          // A sand disc with the head, on the light or dark background (ADR 0044).
           image: BRAND_ASSETS.splash,
           imageWidth: 200,
           resizeMode: 'contain',

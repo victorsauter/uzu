@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <!--
-    Uzu logo (ADR 0043): the head of the owner's Jack Russell, drawn flat from a photo.
+    Uzu logo (ADR 0044): the head of the owner's Jack Russell, drawn flat from a photo.
     Colours of the « Uzu » palette (ADR 0030). Source of every icon and splash image:
     `npm run brand:export` composes and exports them (scripts/export-brand-assets.mjs).
     The groups with an id are used by the script (monochrome layer); keep them.

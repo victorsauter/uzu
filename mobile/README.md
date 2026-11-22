@@ -308,7 +308,7 @@ Les épingles de la carte sont dessinées par l'application (`WalkPin` dans `Wal
 
 ### Logo, icônes et écran de démarrage
 
-Le logo est la tête de la Jack Russell du porteur du produit, dessinée en aplats d'après une photo (voir l'[ADR 0043](../docs/adr/0043-logo-et-icone-uzu.md)). Sa source vectorielle est `assets/brand/uzu-head.svg` ; toutes les images en sont tirées par `npm run brand:export` (`scripts/export-brand-assets.mjs`, rendu par `@resvg/resvg-js`), qui les écrit dans `assets/` :
+Le logo est la tête de la Jack Russell du porteur du produit, dessinée en aplats d'après une photo (voir l'[ADR 0044](../docs/adr/0044-logo-et-icone-uzu.md)). Sa source vectorielle est `assets/brand/uzu-head.svg` ; toutes les images en sont tirées par `npm run brand:export` (`scripts/export-brand-assets.mjs`, rendu par `@resvg/resvg-js`), qui les écrit dans `assets/` :
 
 | Fichier                       | Contenu                                                                                 |
 | ----------------------------- | --------------------------------------------------------------------------------------- |

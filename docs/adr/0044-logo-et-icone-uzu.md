@@ -1,4 +1,4 @@
-# ADR 0043 — Logo, icône et écran de démarrage : la tête d'Uzu en aplats, sur fond sable
+# ADR 0044 — Logo, icône et écran de démarrage : la tête d'Uzu en aplats, sur fond sable
 
 - **Statut :** Accepté
 - **Date :** 22/11/2026

@@ -1,4 +1,5 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
+import { type ConfigPlugin, withEntitlementsPlist } from 'expo/config-plugins';
 
 /**
  * Identity of the app (ADR 0041: the product is called Uzu; the repository and the
@@ -126,6 +127,24 @@ const FREE_SIGNING_EXCLUDED_PLUGINS: readonly string[] = [
   'expo-notifications',
 ];
 
+/** Entitlements a free Apple ID cannot sign (Sign in with Apple, push notifications). */
+export const FREE_SIGNING_REMOVED_ENTITLEMENTS: readonly string[] = [
+  'com.apple.developer.applesignin',
+  'aps-environment',
+];
+
+/**
+ * Removing the two plugins is not enough: Expo applies the plugin of an installed
+ * package even when it is not listed ("legacy" plugins of `@expo/prebuild-config`),
+ * so the entitlements come back. This plugin deletes them from the generated
+ * entitlements file, after the others have written it.
+ */
+export const withoutPaidEntitlements: ConfigPlugin = (config) =>
+  withEntitlementsPlist(config, (modConfig) => {
+    for (const key of FREE_SIGNING_REMOVED_ENTITLEMENTS) delete modConfig.modResults[key];
+    return modConfig;
+  });
+
 /**
  * Builds the Expo configuration from the environment. Everything that differs
  * between development, `preview` and `production` comes from variables (EAS
@@ -201,7 +220,7 @@ export function createConfig({ config }: ConfigContext, env: ConfigEnv = process
     ],
   ];
 
-  return {
+  const expoConfig: ExpoConfig = {
     ...config,
     name: APP.displayName,
     slug: APP.slug,
@@ -257,6 +276,7 @@ export function createConfig({ config }: ConfigContext, env: ConfigEnv = process
       typedRoutes: true,
     },
   };
+  return freeSigning ? withoutPaidEntitlements(expoConfig) : expoConfig;
 }
 
 export default (context: ConfigContext): ExpoConfig => createConfig(context);

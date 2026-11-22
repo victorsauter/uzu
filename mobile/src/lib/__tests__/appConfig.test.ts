@@ -1,6 +1,13 @@
 import type { ConfigContext } from 'expo/config';
 
-import appConfig, { APP, BRAND, assertDistributionConfig, createConfig } from '../../../app.config';
+import appConfig, {
+  APP,
+  BRAND,
+  FREE_SIGNING_REMOVED_ENTITLEMENTS,
+  assertDistributionConfig,
+  createConfig,
+  withoutPaidEntitlements,
+} from '../../../app.config';
 import { SESSION_STORAGE_KEY } from '../../auth/sessionStore';
 import { DISCOVER_LAYOUT_STORAGE_KEY } from '../../discover/layoutPreference';
 import { fr } from '../../strings/fr';
@@ -259,6 +266,35 @@ describe('createConfig', () => {
 
     it('is off for any value other than true', () => {
       expect(createConfig(context, { UZU_FREE_SIGNING: 'false' }).ios?.usesAppleSignIn).toBe(true);
+    });
+
+    type EntitlementsMod = (config: unknown) => Promise<{ modResults: Record<string, unknown> }>;
+    const entitlementsMod = (config: object) =>
+      (config as { mods?: { ios?: { entitlements?: EntitlementsMod } } }).mods?.ios?.entitlements;
+
+    it('applies the plugin that strips the paid entitlements, only with free signing', () => {
+      expect(entitlementsMod(createConfig(context, { UZU_FREE_SIGNING: 'true' }))).toBeDefined();
+      expect(entitlementsMod(createConfig(context, {}))).toBeUndefined();
+    });
+
+    it('strips Sign in with Apple and push from the entitlements, keeping the rest', async () => {
+      // Expo re-applies the plugins of installed packages even when they are not listed.
+      const withMods = withoutPaidEntitlements({ name: 'Uzu', slug: 'uzu' });
+      const mod = entitlementsMod(withMods)!;
+      const result = await mod({
+        ...withMods,
+        modResults: {
+          'aps-environment': 'development',
+          'com.apple.developer.applesignin': ['Default'],
+          'keychain-access-groups': ['group'],
+        },
+        modRequest: { platform: 'ios', modName: 'entitlements' },
+      });
+      expect(result.modResults).toEqual({ 'keychain-access-groups': ['group'] });
+      expect(FREE_SIGNING_REMOVED_ENTITLEMENTS).toEqual([
+        'com.apple.developer.applesignin',
+        'aps-environment',
+      ]);
     });
   });
 

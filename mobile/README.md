@@ -73,7 +73,7 @@ Le code vit à part, dans `src/devtools/` (`demoData.ts` pour les appels typés 
 
 Cette section dit comment produire une build installable sur un vrai téléphone : TestFlight sur iOS, test interne sur Android. Elle est écrite pour une première fois, avec EAS (Expo Application Services). La configuration est prête (`eas.json`, `app.config.ts`) ; **rien n'a encore été construit ni envoyé** : il manque les comptes, qui ne peuvent être créés que par le porteur du produit (voir l'[ADR 0039](../docs/adr/0039-profils-de-build-eas.md)).
 
-> **Identifiants confirmés (ADR 0041).** Nom affiché `Uzu`, slug Expo `uzu`, identifiant de bundle iOS et nom de paquet Android `com.victorsauter.uzu`, schéma de lien `uzu://` (`uzu://walks/<id>`). Ils sont **figés dès la première build envoyée** à App Store Connect ou à Google Play : on ne les change plus ensuite sans créer une nouvelle application. Se fabriquer des builds de développement ou `preview` (installées par lien ou par câble) reste sans conséquence. Les icônes et l'écran de démarrage sont encore ceux du modèle d'Expo (le logo viendra d'un lot suivant) : cela suffit pour tester. Aucune build n'a jamais été distribuée : l'ancien schéma `dogo://` n'est plus accepté, et les clés de stockage `dogo.*` de l'appareil ne sont pas reprises (`uzu.*`).
+> **Identifiants confirmés (ADR 0041).** Nom affiché `Uzu`, slug Expo `uzu`, identifiant de bundle iOS et nom de paquet Android `com.victorsauter.uzu`, schéma de lien `uzu://` (`uzu://walks/<id>`). Ils sont **figés dès la première build envoyée** à App Store Connect ou à Google Play : on ne les change plus ensuite sans créer une nouvelle application. Se fabriquer des builds de développement ou `preview` (installées par lien ou par câble) reste sans conséquence. Aucune build n'a jamais été distribuée : l'ancien schéma `dogo://` n'est plus accepté, et les clés de stockage `dogo.*` de l'appareil ne sont pas reprises (`uzu.*`).
 
 ### Les profils de build (`eas.json`)
 
@@ -210,7 +210,7 @@ eas submit -p android --profile closed-test --latest  # piste « test fermé » 
 5. **Liens profonds** : ouvrir `uzu://walks/<id>` (simulateur : `xcrun simctl openurl booted uzu://walks/<id>` ; Android : `adb shell am start -a android.intent.action.VIEW -d "uzu://walks/<id>"`) ; un lien inconnu (`uzu://nimporte`) affiche la page « introuvable ».
 6. **Position, photos, appareil photo** : les trois demandes d'autorisation apparaissent avec leurs textes en français.
 7. **Mode sombre sur Android** : `expo-doctor` ne le signale pas, mais le prebuild avertit que `userInterfaceStyle` demande `expo-system-ui` sur Android ; à vérifier sur la build, et à installer au besoin.
-8. **Icône, écran de démarrage** : encore ceux du modèle d'Expo, aux couleurs de la charte pour le fond.
+8. **Icône, écran de démarrage** : la tête de Jack Russell sur fond sable (voir « Logo, icônes et écran de démarrage ») ; sur Android, l'icône à thème (Android 13+) montre la silhouette d'une seule couleur, et l'écran de démarrage n'est fidèle que sur une build de distribution (pas dans Expo Go).
 
 ### Client de développement
 
@@ -236,6 +236,7 @@ Le renommage en Uzu (ADR 0041) a suivi ce chemin ; il ne se refait pas après le
 | `npm run format` / `npm run format:check` | Prettier : corriger / vérifier                              |
 | `npm test`                                | Tests Jest (`jest-expo`, React Native Testing Library 14)   |
 | `npm run api:generate`                    | Régénère `src/api/schema.d.ts` depuis `../api/openapi.json` |
+| `npm run brand:export`                    | Réexporte les icônes et l'écran de démarrage depuis le logo |
 
 La CI (`.github/workflows/mobile.yml`) lance `npm ci`, puis types, lint, format et tests.
 
@@ -304,6 +305,20 @@ La palette est celle du pelage d'un Jack Russell (voir l'[ADR 0030](../docs/adr/
 - le rouge de danger reste un rouge, brique, accordé à la palette.
 
 Les épingles de la carte sont dessinées par l'application (`WalkPin` dans `WalksMap.tsx`) : un rond avec une patte, plus grand quand la balade est sélectionnée ; les épingles natives n'acceptent pas de glyphe. Le verre non teinté porte une teinte légère du fond (`glassTint`), et le panneau un voile du fond (`PANEL_VEIL`), pour pencher vers le blanc cassé plutôt que vers le vert d'Apple Plans, qu'on ne peut pas recolorer. Les paires texte/fond sont vérifiées dans `src/theme/__tests__/theme.test.ts` (4,5:1 pour le texte, 3:1 pour les icônes porteuses de sens) : une nouvelle paire utilisée s'y ajoute.
+
+### Logo, icônes et écran de démarrage
+
+Le logo est la tête de la Jack Russell du porteur du produit, dessinée en aplats d'après une photo (voir l'[ADR 0043](../docs/adr/0043-logo-et-icone-uzu.md)). Sa source vectorielle est `assets/brand/uzu-head.svg` ; toutes les images en sont tirées par `npm run brand:export` (`scripts/export-brand-assets.mjs`, rendu par `@resvg/resvg-js`), qui les écrit dans `assets/` :
+
+| Fichier                       | Contenu                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------- |
+| `icon.png`                    | Icône iOS : 1024 px, fond sable plein, **sans canal alpha** (exigence de l'App Store)   |
+| `android-icon-foreground.png` | Avant-plan de l'icône adaptative, transparent, tête dans le cercle sûr de 66 dp sur 108 |
+| `android-icon-monochrome.png` | Icône à thème d'Android 13 : silhouette blanche, yeux, truffe et bouche découpés        |
+| `splash-icon.png`             | Écran de démarrage : disque sable avec la tête, lisible sur le fond clair et le sombre  |
+| `favicon.png`                 | 48 px (le web n'est pas une plateforme livrée, la configuration le demande quand même)  |
+
+Le fond de l'icône adaptative est la couleur `BRAND.iconBackground` (sable, égal au jeton `infoSoft`). Le script refuse d'écrire une image qui sort des règles : pixel transparent dans l'icône iOS, dessin hors du cercle visible sur Android (avant-plan, monochrome, et les deux tiers centraux de l'image de démarrage, seuls montrés par Android 12+). Pour modifier le logo : éditer le SVG (garder les identifiants `ears`, `head`, `markings`, `features`, utilisés pour la silhouette), lancer `npm run brand:export`, puis `npm test` (`appConfig.test.ts` vérifie la taille et la transparence de chaque image) ; versionner le SVG et les PNG ensemble. `notification-icon.png` n'en fait pas partie : silhouette blanche sur fond transparent, teintée par Android de la couleur principale.
 
 ### Ajouter un texte
 

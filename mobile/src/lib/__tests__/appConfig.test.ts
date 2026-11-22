@@ -1,6 +1,12 @@
 import type { ConfigContext } from 'expo/config';
 
-import appConfig, { APP, BRAND, assertDistributionConfig, createConfig } from '../../../app.config';
+import appConfig, {
+  APP,
+  BRAND,
+  BRAND_ASSETS,
+  assertDistributionConfig,
+  createConfig,
+} from '../../../app.config';
 import { SESSION_STORAGE_KEY } from '../../auth/sessionStore';
 import { DISCOVER_LAYOUT_STORAGE_KEY } from '../../discover/layoutPreference';
 import { fr } from '../../strings/fr';
@@ -211,20 +217,77 @@ describe('brand colours', () => {
     expect(BRAND.backgroundLight).toBe(lightColors.background);
     expect(BRAND.backgroundDark).toBe(darkColors.background);
     expect(BRAND.primary).toBe(lightColors.primary);
+    expect(BRAND.iconBackground).toBe(lightColors.infoSoft);
   });
 
-  it('colour the splash screen in light and dark, and the adaptive icon', () => {
+  it('colour the splash screen in light and dark, and the adaptive icon in sand (ADR 0043)', () => {
     const config = createConfig(context, {});
     const splash = config.plugins?.find((p) => Array.isArray(p) && p[0] === 'expo-splash-screen');
     expect(splash).toEqual([
       'expo-splash-screen',
       expect.objectContaining({
+        image: BRAND_ASSETS.splash,
+        imageWidth: 200,
         backgroundColor: BRAND.backgroundLight,
         dark: { backgroundColor: BRAND.backgroundDark },
       }),
     ]);
-    expect(config.android?.adaptiveIcon?.backgroundColor).toBe(BRAND.backgroundLight);
+    expect(config.android?.adaptiveIcon?.backgroundColor).toBe(BRAND.iconBackground);
     // A background image would hide the colour: the adaptive icon has none.
     expect(config.android?.adaptiveIcon?.backgroundImage).toBeUndefined();
+  });
+});
+
+describe('brand assets (ADR 0043)', () => {
+  /** The project has no Node types (they would change the app's globals): the file system is typed here. */
+  const fs = jest.requireActual<{
+    existsSync(path: string): boolean;
+    readFileSync(path: string): Uint8Array;
+    readFileSync(path: string, encoding: 'utf8'): string;
+  }>('node:fs');
+  const mobileRoot = (expect.getState().testPath ?? '').replace(
+    /[\\/]src[\\/]lib[\\/]__tests__[\\/][^\\/]+$/,
+    '',
+  );
+  const resolve = (path: string) => `${mobileRoot}/${path.replace(/^\.\//, '')}`;
+
+  /** Width, height and colour type (2 = RGB, 6 = RGBA) read from the PNG header. */
+  function pngHeader(path: string) {
+    const bytes = fs.readFileSync(resolve(path));
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    expect(String.fromCharCode(view.getUint8(1), view.getUint8(2), view.getUint8(3))).toBe('PNG');
+    return { width: view.getUint32(16), height: view.getUint32(20), colourType: view.getUint8(25) };
+  }
+
+  it('are the images the configuration points to', () => {
+    const config = createConfig(context, {});
+    expect(config.icon).toBe(BRAND_ASSETS.icon);
+    expect(config.android?.adaptiveIcon?.foregroundImage).toBe(BRAND_ASSETS.androidForeground);
+    expect(config.android?.adaptiveIcon?.monochromeImage).toBe(BRAND_ASSETS.androidMonochrome);
+    expect(config.web?.favicon).toBe(BRAND_ASSETS.favicon);
+  });
+
+  it('give iOS a 1024 px icon without an alpha channel, as the App Store requires', () => {
+    expect(pngHeader(BRAND_ASSETS.icon)).toEqual({ width: 1024, height: 1024, colourType: 2 });
+  });
+
+  it.each([BRAND_ASSETS.androidForeground, BRAND_ASSETS.androidMonochrome, BRAND_ASSETS.splash])(
+    'draw %s as a transparent square layer',
+    (path) => {
+      expect(pngHeader(path)).toEqual({ width: 1024, height: 1024, colourType: 6 });
+    },
+  );
+
+  it('give the web a 48 px favicon', () => {
+    expect(pngHeader(BRAND_ASSETS.favicon)).toMatchObject({ width: 48, height: 48 });
+  });
+
+  it('keep the vector source with the parts the export script uses', () => {
+    const source = resolve('assets/brand/uzu-head.svg');
+    expect(fs.existsSync(source)).toBe(true);
+    const svg = fs.readFileSync(source, 'utf8');
+    for (const id of ['ears', 'head', 'markings', 'features']) {
+      expect(svg).toContain(`id="${id}"`);
+    }
   });
 });

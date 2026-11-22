@@ -44,6 +44,7 @@ Chaque fichier consigne une décision technique : son contexte, ce qui est déci
 | [0040](0040-navigation-gardee-et-rafraichissement-apres-refus.md) | Navigation gardée contre les appuis répétés, rafraîchissement après un refus 404 ou 409, mise en page qui suit la taille du texte | Proposé |
 | [0041](0041-nom-de-l-application-uzu.md) | Nom de l'application : Uzu (`com.victorsauter.uzu`, schéma `uzu://`, slug `uzu`) ; le dépôt et le code gardent `dogo` | Accepté |
 | [0042](0042-chien-relie-a-plusieurs-humains.md) | Un chien relié à plusieurs humains : liens `DogMember` (rôle `Owner`), invitation par lien `uzu://`, droits égaux, plafond de 20 chiens par humain ; précise les ADR 0023 et 0037 | Proposé |
+| [0043](0043-logo-et-icone-uzu.md) | Logo, icône et écran de démarrage : la tête de la Jack Russell du porteur du produit en aplats, sur fond sable ; source SVG et export vérifié par script ; précise l'ADR 0030 | Accepté |
 
 Les numéros 0016 et 0024 n'ont jamais été attribués : il n'y a pas d'ADR manquant.
 

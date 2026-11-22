@@ -2,6 +2,7 @@
 
 - **Statut :** Accepté
 - **Date :** 18/11/2026
+- **Précisé par :** [ADR 0043](0043-logo-et-icone-uzu.md) (logo, icône et écran de démarrage).
 
 ## Contexte
 

@@ -30,6 +30,20 @@ export const BRAND = {
   backgroundLight: '#FBF6EC',
   backgroundDark: '#14100D',
   primary: '#9C5626',
+  /** Sand behind the logo (ADR 0043): background of the icons, the only colour of the palette on which the white, fawn and black of the head all stand out. */
+  iconBackground: '#E9C9A0',
+} as const;
+
+/**
+ * Icon and splash images, exported from the logo drawing `assets/brand/uzu-head.svg`
+ * by `npm run brand:export` (ADR 0043). A test checks their size and transparency.
+ */
+export const BRAND_ASSETS = {
+  icon: './assets/icon.png',
+  androidForeground: './assets/android-icon-foreground.png',
+  androidMonochrome: './assets/android-icon-monochrome.png',
+  splash: './assets/splash-icon.png',
+  favicon: './assets/favicon.png',
 } as const;
 
 /**
@@ -143,7 +157,7 @@ export function createConfig({ config }: ConfigContext, env: ConfigEnv = process
     platforms: ['ios', 'android'],
     version: '0.1.0',
     orientation: 'portrait',
-    icon: './assets/icon.png',
+    icon: BRAND_ASSETS.icon,
     userInterfaceStyle: 'automatic',
     ios: {
       bundleIdentifier: APP.iosBundleIdentifier,
@@ -162,9 +176,9 @@ export function createConfig({ config }: ConfigContext, env: ConfigEnv = process
     android: {
       package: APP.androidPackage,
       adaptiveIcon: {
-        backgroundColor: BRAND.backgroundLight,
-        foregroundImage: './assets/android-icon-foreground.png',
-        monochromeImage: './assets/android-icon-monochrome.png',
+        backgroundColor: BRAND.iconBackground,
+        foregroundImage: BRAND_ASSETS.androidForeground,
+        monochromeImage: BRAND_ASSETS.androidMonochrome,
       },
       permissions: [
         'android.permission.ACCESS_COARSE_LOCATION',
@@ -176,7 +190,7 @@ export function createConfig({ config }: ConfigContext, env: ConfigEnv = process
       ...(googleServicesFile ? { googleServicesFile } : {}),
     },
     web: {
-      favicon: './assets/favicon.png',
+      favicon: BRAND_ASSETS.favicon,
     },
     ...(easProjectId ? { extra: { ...config.extra, eas: { projectId: easProjectId } } } : {}),
     plugins: [
@@ -211,8 +225,9 @@ export function createConfig({ config }: ConfigContext, env: ConfigEnv = process
       [
         'expo-splash-screen',
         {
-          image: './assets/splash-icon.png',
-          imageWidth: 160,
+          // A sand disc with the head, on the light or dark background (ADR 0043).
+          image: BRAND_ASSETS.splash,
+          imageWidth: 200,
           resizeMode: 'contain',
           backgroundColor: BRAND.backgroundLight,
           dark: { backgroundColor: BRAND.backgroundDark },

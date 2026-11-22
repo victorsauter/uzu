@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!--
+    Uzu logo (ADR 0043): the head of the owner's Jack Russell, drawn flat from a photo.
+    Colours of the « Uzu » palette (ADR 0030). Source of every icon and splash image:
+    `npm run brand:export` composes and exports them (scripts/export-brand-assets.mjs).
+    The groups with an id are used by the script (monochrome layer); keep them.
+  -->
+  <defs>
+    <clipPath id="head-clip">
+      <path d="M512 318 C640 318 734 380 736 490 C738 580 690 650 650 720 C620 775 575 800 512 800 C449 800 404 775 374 720 C334 650 286 580 288 490 C290 380 384 318 512 318 Z"/>
+    </clipPath>
+  </defs>
+  <g id="ears" stroke-width="56" stroke-linejoin="round">
+    <!-- Right ear, raised and folded outwards; left ear, folded forwards. -->
+    <polygon points="590,350 745,250 800,420" fill="#9C5626" stroke="#9C5626"/>
+    <polygon points="712,272 745,250 800,420" fill="#5C3A1C" stroke="#5C3A1C"/>
+    <polygon points="430,345 262,318 268,520" fill="#9C5626" stroke="#9C5626"/>
+    <polygon points="262,318 300,324 268,520" fill="#5C3A1C" stroke="#5C3A1C"/>
+  </g>
+  <path id="head" d="M512 318 C640 318 734 380 736 490 C738 580 690 650 650 720 C620 775 575 800 512 800 C449 800 404 775 374 720 C334 650 286 580 288 490 C290 380 384 318 512 318 Z" fill="#FFFDF9"/>
+  <g id="markings" clip-path="url(#head-clip)">
+    <!-- Fawn cheeks, black cap, white blaze running down to the muzzle. -->
+    <rect x="250" y="430" width="524" height="420" fill="#9C5626"/>
+    <path d="M250 300 H774 V490 Q690 430 600 470 Q560 488 534 520 H490 Q464 488 424 470 Q334 430 250 490 Z" fill="#1F1A17"/>
+    <path d="M497 300 H527 Q538 460 556 590 H468 Q486 460 497 300 Z" fill="#FFFDF9"/>
+    <ellipse cx="512" cy="700" rx="120" ry="118" fill="#FFFDF9"/>
+  </g>
+  <g id="features" fill="#14100D">
+    <ellipse cx="436" cy="548" rx="24" ry="28"/>
+    <ellipse cx="588" cy="548" rx="24" ry="28"/>
+    <rect x="467" y="634" width="90" height="58" rx="29"/>
+    <path d="M489 726 Q512 742 535 726" stroke="#14100D" stroke-width="11" stroke-linecap="round" fill="none"/>
+  </g>
+  <g id="eye-lights" fill="#FFFDF9">
+    <circle cx="443" cy="537" r="7.5"/>
+    <circle cx="595" cy="537" r="7.5"/>
+  </g>
+</svg>

@@ -4,7 +4,7 @@
 
 Ce guide s'adresse à une personne qui le fait pour la première fois. Il met en ligne une **API de démonstration** avec des données fictives, **gratuitement**, et suit l'[ADR 0043](adr/0043-demo-hebergee.md). Ce n'est **pas** un guide de production : pour une vraie mise en ligne, voir le [guide de déploiement](deploiement.md). La partie iPhone (build Xcode) est dans le [README du mobile](../mobile/README.md#build-de-démo-sur-un-iphone-avec-un-apple-id-gratuit).
 
-**Mentions « non vérifié ».** Je n'ai créé aucun compte ni déployé quoi que ce soit en écrivant ce guide. Ce qui vient de la documentation officielle est lié à sa source ; ce que je n'ai pas pu confirmer est marqué **non vérifié** : les noms exacts des boutons peuvent avoir changé, et chaque plan gratuit peut évoluer. En cas de doute, la page officielle prime.
+**Mentions « non vérifié ».** La démo a été mise en ligne le 22/11/2026 en suivant ce guide, mais les mentions ci-dessous n'ont pas été relues depuis. À l'écriture du guide, aucun compte n'avait été créé ni rien déployé. Ce qui vient de la documentation officielle est lié à sa source ; ce que je n'ai pas pu confirmer est marqué **non vérifié** : les noms exacts des boutons peuvent avoir changé, et chaque plan gratuit peut évoluer. En cas de doute, la page officielle prime.
 
 ## 0. Vue d'ensemble
 

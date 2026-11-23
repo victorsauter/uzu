@@ -10,7 +10,7 @@ Application iOS et Android d’Uzu (le nom du produit, voir l’ADR 0041 ; le d�
 - Pour un téléphone : l'application Expo Go (App Store ou Play Store).
 - L'API Uzu lancée en local (voir `api/README.md`), sur `http://localhost:5080` par défaut.
 
-L'application se lance et s'utilise entièrement dans **Expo Go et le simulateur iOS** avec la connexion de test. Ce qui demande une **version de développement** (`expo prebuild` ou EAS, voir « Construire une version de test » plus bas ; pas encore construite) :
+L'application se lance et s'utilise entièrement dans **Expo Go et le simulateur iOS** avec la connexion de test. Ce qui demande une **version de développement** (`expo prebuild` ou EAS, voir « Construire une version de test » plus bas ; aucune build EAS n'a encore été faite) :
 
 - la **connexion Google** (`@react-native-google-signin/google-signin`, code natif absent d'Expo Go) ; sans elle, ou sans identifiants, le bouton est masqué ;
 - les **notifications push** : sans projet EAS (`EXPO_PUBLIC_EAS_PROJECT_ID`), elles sont indisponibles et l'application l'ignore sans rien afficher (voir « Notifications » plus bas et l'[ADR 0022](../docs/adr/0022-notifications-push-mobile.md)).
@@ -74,7 +74,7 @@ Le code vit à part, dans `src/devtools/` (`demoData.ts` pour les appels typés 
 
 ## Construire une version de test
 
-Cette section dit comment produire une build installable sur un vrai téléphone : TestFlight sur iOS, test interne sur Android. Elle est écrite pour une première fois, avec EAS (Expo Application Services). La configuration est prête (`eas.json`, `app.config.ts`) ; **rien n'a encore été construit ni envoyé** : il manque les comptes, qui ne peuvent être créés que par le porteur du produit (voir l'[ADR 0039](../docs/adr/0039-profils-de-build-eas.md)).
+Cette section dit comment produire une build installable sur un vrai téléphone : TestFlight sur iOS, test interne sur Android. Elle est écrite pour une première fois, avec EAS (Expo Application Services). La configuration est prête (`eas.json`, `app.config.ts`) ; **rien n'a encore été construit avec EAS ni envoyé** (seule la build de démo à signature gratuite, plus bas, a été faite en local) : il manque les comptes, qui ne peuvent être créés que par le porteur du produit (voir l'[ADR 0039](../docs/adr/0039-profils-de-build-eas.md)).
 
 > **Identifiants confirmés (ADR 0041).** Nom affiché `Uzu`, slug Expo `uzu`, identifiant de bundle iOS et nom de paquet Android `com.victorsauter.uzu`, schéma de lien `uzu://` (`uzu://walks/<id>`). Ils sont **figés dès la première build envoyée** à App Store Connect ou à Google Play : on ne les change plus ensuite sans créer une nouvelle application. Se fabriquer des builds de développement ou `preview` (installées par lien ou par câble) reste sans conséquence. Les icônes et l'écran de démarrage sont encore ceux du modèle d'Expo (le logo viendra d'un lot suivant) : cela suffit pour tester. Aucune build n'a jamais été distribuée : l'ancien schéma `dogo://` n'est plus accepté, et les clés de stockage `dogo.*` de l'appareil ne sont pas reprises (`uzu.*`).
 
@@ -276,7 +276,7 @@ npm run api:generate
 npm run typecheck
 ```
 
-Le script lit `../api/openapi.json` et échoue avec un message clair s'il n'existe pas. `src/api/schema.d.ts` est généré depuis `api/openapi.json` (lot 1 de l'API). À chaque changement de `api/openapi.json`, régénérer et versionner `schema.d.ts` dans la même demande de fusion.
+Le script lit `../api/openapi.json` et échoue avec un message clair s'il n'existe pas. `src/api/schema.d.ts` est généré depuis `api/openapi.json`. Après un changement de l'API, la relancer avant de tester l'application (`dotnet run` ne recharge pas le code) ; la marche complète est dans le [README racine](../README.md#modifier-un-point-dentrée-de-lapi). À chaque changement de `api/openapi.json`, régénérer et versionner `schema.d.ts` dans la même demande de fusion.
 
 ## Structure
 
